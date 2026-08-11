@@ -413,7 +413,7 @@
             <div id="sub-disciplinas" class="sub-secao">
                 <div class="input-group">
                     <input type="text" id="input-disciplinas" placeholder="Nova disciplina (Ex: Matemática)">
-                    <button class="btn-adicionar" onclick="adicionarItemMock('disciplinas')">Adicionar</button>
+                    <button class="btn-adicionar" onclick="salvarDisciplinaReal()">Adicionar</button>
                 </div>
                 <ul id="lista-disciplinas" class="lista-cadastros"></ul>
             </div>
@@ -422,7 +422,7 @@
             <div id="sub-professores" class="sub-secao">
                 <div class="input-group">
                     <input type="text" id="input-professores" placeholder="Novo professor (Ex: Prof. Carlos)">
-                    <button class="btn-adicionar" onclick="adicionarItemMock('professores')">Adicionar</button>
+                    <button class="btn-adicionar" onclick="salvarProfessorReal()">Adicionar</button>
                 </div>
                 <ul id="lista-professores" class="lista-cadastros"></ul>
             </div>
@@ -720,8 +720,85 @@
             }
         }
 
-        // 3. Gatilho automático: Carrega as turmas assim que a página abrir
-        window.addEventListener('DOMContentLoaded', carregarTurmas);
+         // ============================================================================
+        // API - DISCIPLINAS
+        // ============================================================================
+        async function carregarDisciplinas() {
+            const resposta = await fetch('/api/disciplinas');
+            const disciplinas = await resposta.json();
+            const lista = document.getElementById('lista-disciplinas');
+            lista.innerHTML = ''; 
+            disciplinas.forEach(disc => {
+                const li = document.createElement('li');
+                li.innerHTML = `${disc.nome} <button class="btn-remover" onclick="removerDisciplinaReal(${disc.id})">✖</button>`;
+                lista.appendChild(li);
+            });
+        }
+
+        async function salvarDisciplinaReal() {
+            const input = document.getElementById('input-disciplinas');
+            const nome = input.value.trim();
+            if (!nome) return;
+            
+            input.disabled = true;
+            await fetch('/api/disciplinas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome: nome })
+            });
+            input.value = '';
+            input.disabled = false;
+            carregarDisciplinas();
+        }
+
+        async function removerDisciplinaReal(id) {
+            if (!confirm("Excluir esta disciplina?")) return;
+            await fetch(`/api/disciplinas/${id}`, { method: 'DELETE' });
+            carregarDisciplinas();
+        }
+
+        // ============================================================================
+        // API - PROFESSORES
+        // ============================================================================
+        async function carregarProfessores() {
+            const resposta = await fetch('/api/professores');
+            const professores = await resposta.json();
+            const lista = document.getElementById('lista-professores');
+            lista.innerHTML = ''; 
+            professores.forEach(prof => {
+                const li = document.createElement('li');
+                li.innerHTML = `${prof.nome} <button class="btn-remover" onclick="removerProfessorReal(${prof.id})">✖</button>`;
+                lista.appendChild(li);
+            });
+        }
+
+        async function salvarProfessorReal() {
+            const input = document.getElementById('input-professores');
+            const nome = input.value.trim();
+            if (!nome) return;
+            
+            input.disabled = true;
+            await fetch('/api/professores', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome: nome })
+            });
+            input.value = '';
+            input.disabled = false;
+            carregarProfessores();
+        }
+
+        async function removerProfessorReal(id) {
+            if (!confirm("Excluir este professor?")) return;
+            await fetch(`/api/professores/${id}`, { method: 'DELETE' });
+            carregarProfessores();
+        }
+
+     window.addEventListener('DOMContentLoaded', () => {
+         carregarTurmas();
+         carregarDisciplinas();
+         carregarProfessores();
+     });
         
     </script>
 </body>
