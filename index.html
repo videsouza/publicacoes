@@ -243,6 +243,101 @@
             font-weight: bold;
             font-size: 1.2rem;
         }
+
+        /* ========================================== */
+        /* WIZARD E GRADE (GERADOR)                   */
+        /* ========================================== */
+        .wizard-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            background: var(--azul-claro);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .passo-indicador {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            color: var(--texto-cinza);
+            font-weight: 600;
+            border-radius: 6px;
+        }
+
+        .passo-indicador.ativo {
+            background-color: var(--azul-primario);
+            color: white;
+        }
+
+        .passo-conteudo {
+            display: none;
+        }
+
+        .passo-conteudo.visivel {
+            display: block;
+        }
+
+        /* Tabela de Grade / Grid Panel */
+        .tabela-container {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--borda);
+            border-radius: 8px;
+            background: white;
+        }
+
+        .tabela-grade {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+
+        .tabela-grade th {
+            background-color: var(--azul-primario);
+            color: white;
+            padding: 15px;
+            font-weight: 500;
+        }
+
+        .tabela-grade td {
+            padding: 12px;
+            border: 1px solid var(--borda);
+            color: var(--texto-escuro);
+        }
+
+        .tabela-grade tr:nth-child(even) {
+            background-color: var(--fundo-tela);
+        }
+
+        .btn-wizard {
+            background-color: var(--azul-secundario);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 20px;
+            float: right;
+            transition: 0.2s;
+        }
+
+        .btn-wizard:hover {
+            background-color: var(--azul-primario);
+        }
+
+        .btn-wizard.voltar {
+            background-color: white;
+            color: var(--texto-cinza);
+            border: 1px solid var(--borda);
+            float: left;
+        }
+
+        .btn-wizard.voltar:hover {
+            background-color: var(--fundo-tela);
+        }
         
     </style>
 </head>
@@ -334,11 +429,132 @@
         </div>
 
         <!-- SEÇÃO 3: GERADOR (Vazia por enquanto) -->
+<!-- SEÇÃO 3: GERADOR DE GRADE -->
         <div id="secao-gerador" class="secao-conteudo">
             <div class="header-top">
                 <h1>Gerador de Grade Escolar</h1>
             </div>
-            <p>O painel de processamento matemático entrará aqui em breve.</p>
+
+            <!-- Navegação do Wizard -->
+            <div class="wizard-header">
+                <div id="ind-passo-1" class="passo-indicador ativo">1. Horários</div>
+                <div id="ind-passo-2" class="passo-indicador">2. Regras e IA</div>
+                <div id="ind-passo-3" class="passo-indicador">3. Grade Gerada</div>
+            </div>
+
+            <!-- PASSO 1: Estrutura de Horários -->
+            <div id="passo-1" class="passo-conteudo visivel">
+                <h3 style="color: var(--azul-primario);">Estrutura de Períodos</h3>
+                <p>Defina a quantidade de aulas diárias e os intervalos.</p>
+                
+                <div class="tabela-container">
+                    <table class="tabela-grade">
+                        <thead>
+                            <tr>
+                                <th>Horário</th>
+                                <th>Tipo (Aula/Intervalo)</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpo-periodos">
+                            <tr>
+                                <td><input type="time" style="padding: 5px;"> às <input type="time" style="padding: 5px;"></td>
+                                <td>
+                                    <select style="padding: 5px;">
+                                        <option>Período de Aula</option>
+                                        <option>Intervalo / Recreio</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button class="btn-wizard voltar" style="margin-top: 15px;" onclick="adicionarPeriodo()">+ Adicionar Linha</button>
+                <div style="clear: both;"></div>
+
+                <button class="btn-wizard" onclick="mudarPasso(1, 2)">Próximo Passo ➔</button>
+                <div style="clear: both;"></div>
+            </div>
+
+            <!-- PASSO 2: Regras e IA -->
+            <div id="passo-2" class="passo-conteudo">
+                <h3 style="color: var(--azul-primario);">Configuração do Algoritmo</h3>
+                <p>Selecione as regras matemáticas que a Inteligência do sistema deve respeitar.</p>
+                
+                <div style="background: var(--fundo-tela); padding: 20px; border-radius: 8px; border: 1px solid var(--borda);">
+                    <label style="display: block; margin-bottom: 15px;">
+                        <input type="checkbox" checked> <strong>Evitar Janelas:</strong> Impedir horários vagos entre as aulas de um mesmo professor.
+                    </label>
+                    <label style="display: block; margin-bottom: 15px;">
+                        <input type="checkbox" checked> <strong>Dispersão Uniforme:</strong> Espalhar aulas da mesma disciplina ao longo da semana.
+                    </label>
+                    <label style="display: block;">
+                        <input type="checkbox"> <strong>Controle de Fadiga:</strong> Impedir que um professor dê mais de 3 aulas seguidas.
+                    </label>
+                </div>
+
+                <button class="btn-wizard voltar" onclick="mudarPasso(2, 1)">🡠 Voltar</button>
+                <button class="btn-wizard" style="background-color: #10b981;" onclick="mudarPasso(2, 3)">⚙️ Gerar Grade Mestra</button>
+                <div style="clear: both;"></div>
+            </div>
+
+            <!-- PASSO 3: Grade Gerada (Resultado) -->
+            <div id="passo-3" class="passo-conteudo">
+                <h3 style="color: var(--azul-primario);">Matriz Curricular Concluída</h3>
+                <p>Visualização final da grade gerada pelo sistema.</p>
+                
+                <div class="tabela-container">
+                    <table class="tabela-grade">
+                        <thead>
+                            <tr>
+                                <th>Horário</th>
+                                <th>Segunda</th>
+                                <th>Terça</th>
+                                <th>Quarta</th>
+                                <th>Quinta</th>
+                                <th>Sexta</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>1º Período</strong></td>
+                                <td>Matemática</td>
+                                <td>Português</td>
+                                <td>História</td>
+                                <td>Geografia</td>
+                                <td>Física</td>
+                            </tr>
+                            <tr>
+                                <td><strong>2º Período</strong></td>
+                                <td>Matemática</td>
+                                <td>Inglês</td>
+                                <td>Biologia</td>
+                                <td>Educação Física</td>
+                                <td>Química</td>
+                            </tr>
+                            <!-- Simulação de Intervalo -->
+                            <tr style="background-color: var(--azul-claro);">
+                                <td><strong>Intervalo</strong></td>
+                                <td colspan="5" style="color: var(--azul-primario); font-weight: bold;">R E C R E I O</td>
+                            </tr>
+                            <tr>
+                                <td><strong>3º Período</strong></td>
+                                <td>Artes</td>
+                                <td>Física</td>
+                                <td>Química</td>
+                                <td>Matemática</td>
+                                <td>Português</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <button class="btn-wizard voltar" onclick="mudarPasso(3, 2)">🡠 Refazer Geração</button>
+                <button class="btn-wizard">💾 Salvar e Finalizar</button>
+                <div style="clear: both;"></div>
+            </div>
+
         </div>
 
     </main>
@@ -395,6 +611,38 @@
             
             lista.appendChild(li);
             input.value = ''; // Limpa o campo
+        }
+
+        // Lógica do Wizard (Passo a Passo da Grade)
+        function mudarPasso(passoAtual, proximoPasso) {
+            // Esconde o passo atual e tira o destaque
+            document.getElementById('passo-' + passoAtual).classList.remove('visivel');
+            document.getElementById('ind-passo-' + passoAtual).classList.remove('ativo');
+            
+            // Mostra o novo passo e adiciona o destaque
+            document.getElementById('passo-' + proximoPasso).classList.add('visivel');
+            document.getElementById('ind-passo-' + proximoPasso).classList.add('ativo');
+
+            // Se for do 2 para o 3, podemos simular o "carregamento" da IA no futuro
+        }
+
+        // Adiciona uma nova linha na tabela do Passo 1
+        function adicionarPeriodo() {
+            const corpo = document.getElementById('corpo-periodos');
+            const linha = document.createElement('tr');
+            
+            linha.innerHTML = `
+                <td><input type="time" style="padding: 5px;"> às <input type="time" style="padding: 5px;"></td>
+                <td>
+                    <select style="padding: 5px;">
+                        <option>Período de Aula</option>
+                        <option>Intervalo / Recreio</option>
+                    </select>
+                </td>
+                <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
+            `;
+            
+            corpo.appendChild(linha);
         }
         
     </script>
