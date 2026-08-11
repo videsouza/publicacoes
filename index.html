@@ -428,18 +428,18 @@
             </div>
         </div>
 
-        <!-- SEÇÃO 3: GERADOR (Vazia por enquanto) -->
 <!-- SEÇÃO 3: GERADOR DE GRADE -->
         <div id="secao-gerador" class="secao-conteudo">
             <div class="header-top">
                 <h1>Gerador de Grade Escolar</h1>
             </div>
 
-            <!-- Navegação do Wizard -->
+            <!-- Navegação do Wizard (Agora com 4 passos) -->
             <div class="wizard-header">
                 <div id="ind-passo-1" class="passo-indicador ativo">1. Horários</div>
-                <div id="ind-passo-2" class="passo-indicador">2. Regras e IA</div>
-                <div id="ind-passo-3" class="passo-indicador">3. Grade Gerada</div>
+                <div id="ind-passo-2" class="passo-indicador">2. Matriz Curricular</div>
+                <div id="ind-passo-3" class="passo-indicador">3. Regras e IA</div>
+                <div id="ind-passo-4" class="passo-indicador">4. Grade Gerada</div>
             </div>
 
             <!-- PASSO 1: Estrutura de Horários -->
@@ -477,8 +477,28 @@
                 <div style="clear: both;"></div>
             </div>
 
-            <!-- PASSO 2: Regras e IA -->
+            <!-- PASSO 2: Matriz Curricular (A PONTE DOS DADOS) -->
             <div id="passo-2" class="passo-conteudo">
+                <h3 style="color: var(--azul-primario);">Matriz Curricular</h3>
+                <p>Vincule a Turma, a Disciplina e o Professor. Defina quantas aulas semanais ocorrerão.</p>
+                
+                <div class="input-group" style="flex-wrap: wrap;">
+                    <select id="sel-turma" style="flex: 1; padding: 12px; border: 1px solid var(--borda); border-radius: 6px;"></select>
+                    <select id="sel-disciplina" style="flex: 1; padding: 12px; border: 1px solid var(--borda); border-radius: 6px;"></select>
+                    <select id="sel-professor" style="flex: 1; padding: 12px; border: 1px solid var(--borda); border-radius: 6px;"></select>
+                    <input type="number" id="qtd-aulas" placeholder="Qtd. Aulas/Semana" min="1" max="10" style="padding: 12px; border: 1px solid var(--borda); border-radius: 6px; width: 160px;">
+                    <button class="btn-adicionar" onclick="adicionarVinculo()">Vincular</button>
+                </div>
+                
+                <ul id="lista-matriz" class="lista-cadastros"></ul>
+
+                <button class="btn-wizard voltar" onclick="mudarPasso(2, 1)">🡠 Voltar</button>
+                <button class="btn-wizard" onclick="mudarPasso(2, 3)">Próximo Passo ➔</button>
+                <div style="clear: both;"></div>
+            </div>
+
+            <!-- PASSO 3: Regras e IA -->
+            <div id="passo-3" class="passo-conteudo">
                 <h3 style="color: var(--azul-primario);">Configuração do Algoritmo</h3>
                 <p>Selecione as regras matemáticas que a Inteligência do sistema deve respeitar.</p>
                 
@@ -494,13 +514,13 @@
                     </label>
                 </div>
 
-                <button class="btn-wizard voltar" onclick="mudarPasso(2, 1)">🡠 Voltar</button>
-                <button class="btn-wizard" style="background-color: #10b981;" onclick="mudarPasso(2, 3)">⚙️ Gerar Grade Mestra</button>
+                <button class="btn-wizard voltar" onclick="mudarPasso(3, 2)">🡠 Voltar</button>
+                <button class="btn-wizard" style="background-color: #10b981;" onclick="mudarPasso(3, 4)">⚙️ Gerar Grade Mestra</button>
                 <div style="clear: both;"></div>
             </div>
 
-            <!-- PASSO 3: Grade Gerada (Resultado) -->
-            <div id="passo-3" class="passo-conteudo">
+            <!-- PASSO 4: Grade Gerada (Resultado) -->
+            <div id="passo-4" class="passo-conteudo">
                 <h3 style="color: var(--azul-primario);">Matriz Curricular Concluída</h3>
                 <p>Visualização final da grade gerada pelo sistema.</p>
                 
@@ -525,36 +545,14 @@
                                 <td>Geografia</td>
                                 <td>Física</td>
                             </tr>
-                            <tr>
-                                <td><strong>2º Período</strong></td>
-                                <td>Matemática</td>
-                                <td>Inglês</td>
-                                <td>Biologia</td>
-                                <td>Educação Física</td>
-                                <td>Química</td>
-                            </tr>
-                            <!-- Simulação de Intervalo -->
-                            <tr style="background-color: var(--azul-claro);">
-                                <td><strong>Intervalo</strong></td>
-                                <td colspan="5" style="color: var(--azul-primario); font-weight: bold;">R E C R E I O</td>
-                            </tr>
-                            <tr>
-                                <td><strong>3º Período</strong></td>
-                                <td>Artes</td>
-                                <td>Física</td>
-                                <td>Química</td>
-                                <td>Matemática</td>
-                                <td>Português</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <button class="btn-wizard voltar" onclick="mudarPasso(3, 2)">🡠 Refazer Geração</button>
+                <button class="btn-wizard voltar" onclick="mudarPasso(4, 3)">🡠 Refazer Geração</button>
                 <button class="btn-wizard">💾 Salvar e Finalizar</button>
                 <div style="clear: both;"></div>
             </div>
-
         </div>
 
     </main>
@@ -562,24 +560,23 @@
     <!-- Lógica de Navegação Limpa -->
     <script>
         function navegarPara(secaoId) {
-            // 1. Esconde todas as seções
             document.querySelectorAll('.secao-conteudo').forEach(secao => {
                 secao.classList.remove('visivel');
             });
 
-            // 2. Remove o destaque de todos os itens do menu
             document.querySelectorAll('.menu-item').forEach(item => {
                 item.classList.remove('ativo');
             });
 
-            // 3. Mostra a seção clicada
             document.getElementById('secao-' + secaoId).classList.add('visivel');
 
-            // 4. Adiciona o destaque no menu correspondente (simplificado)
             const itensMenu = document.querySelectorAll('.menu-item');
             if(secaoId === 'hub') itensMenu[0].classList.add('ativo');
             if(secaoId === 'cadastros') itensMenu[1].classList.add('ativo');
-            if(secaoId === 'gerador') itensMenu[2].classList.add('ativo');
+            if(secaoId === 'gerador') {
+                itensMenu[2].classList.add('ativo');
+                carregarDropdownsMatriz(); // <-- ADICIONE ESTA LINHA AQUI
+            }
         }
 
         // 4. Remove a turma do banco de dados
@@ -799,6 +796,72 @@
          carregarDisciplinas();
          carregarProfessores();
      });
+
+    // ============================================================================
+        // MOTOR DA MATRIZ CURRICULAR
+        // ============================================================================
+        
+        async function carregarDropdownsMatriz() {
+            try {
+                // Puxa as informações fresquinhas do banco de dados
+                const resTurmas = await fetch('/api/turmas');
+                const turmas = await resTurmas.json();
+                
+                const resDisc = await fetch('/api/disciplinas');
+                const disciplinas = await resDisc.json();
+                
+                const resProf = await fetch('/api/professores');
+                const professores = await resProf.json();
+
+                // Preenche o botão de Turmas
+                const selTurma = document.getElementById('sel-turma');
+                selTurma.innerHTML = '<option value="">Selecione a Turma...</option>' + 
+                    turmas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('');
+
+                // Preenche o botão de Disciplinas
+                const selDisc = document.getElementById('sel-disciplina');
+                selDisc.innerHTML = '<option value="">Selecione a Disciplina...</option>' + 
+                    disciplinas.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+
+                // Preenche o botão de Professores
+                const selProf = document.getElementById('sel-professor');
+                selProf.innerHTML = '<option value="">Selecione o Professor...</option>' + 
+                    professores.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+
+            } catch (erro) {
+                console.error("Erro ao carregar os dados para a matriz:", erro);
+            }
+        }
+
+        function adicionarVinculo() {
+            const dropdownTurma = document.getElementById('sel-turma');
+            const dropdownDisc = document.getElementById('sel-disciplina');
+            const dropdownProf = document.getElementById('sel-professor');
+            const inputAulas = document.getElementById('qtd-aulas');
+
+            // Verifica se o usuário selecionou tudo
+            if (dropdownTurma.value === '' || dropdownDisc.value === '' || dropdownProf.value === '' || !inputAulas.value) {
+                alert("Por favor, preencha todos os campos do vínculo.");
+                return;
+            }
+
+            // Pega o texto visível que o usuário escolheu
+            const nomeTurma = dropdownTurma.options[dropdownTurma.selectedIndex].text;
+            const nomeDisc = dropdownDisc.options[dropdownDisc.selectedIndex].text;
+            const nomeProf = dropdownProf.options[dropdownProf.selectedIndex].text;
+            const qtd = inputAulas.value;
+
+            // Cria a linha na tela
+            const lista = document.getElementById('lista-matriz');
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span style="flex: 1;"><strong>${nomeTurma}</strong>: ${nomeDisc} com ${nomeProf} <em>(${qtd} aulas/semana)</em></span>
+                <button class="btn-remover" onclick="this.parentElement.remove()">✖</button>
+            `;
+            
+            lista.appendChild(li);
+            inputAulas.value = ''; // Limpa a quantidade para o próximo vínculo
+        }
         
     </script>
 </body>
