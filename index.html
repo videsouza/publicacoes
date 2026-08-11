@@ -582,6 +582,23 @@
             if(secaoId === 'gerador') itensMenu[2].classList.add('ativo');
         }
 
+        // 4. Remove a turma do banco de dados
+        async function removerTurmaReal(id) {
+            if (!confirm("Tem certeza que deseja excluir esta turma?")) return;
+
+            try {
+                const resposta = await fetch(`/api/turmas/${id}`, { method: 'DELETE' });
+                
+                if (resposta.ok) {
+                    carregarTurmas(); // Recarrega a lista automaticamente
+                } else {
+                    alert("Erro ao excluir no servidor.");
+                }
+            } catch (erro) {
+                alert("Falha de comunicação com a API.");
+            }
+        }
+
         // Alterna entre as abas internas de Cadastro
         function mudarSubAba(abaId, evento) {
             // Esconde os conteúdos
@@ -662,7 +679,7 @@
                     const li = document.createElement('li');
                     li.innerHTML = `
                         ${turma.nome} 
-                        <button class="btn-remover">✖</button>
+                        <button class="btn-remover" onclick="removerTurmaReal(${turma.id})">✖</button>
                     `;
                     lista.appendChild(li);
                 });
