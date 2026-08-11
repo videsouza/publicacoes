@@ -140,6 +140,110 @@
         .secao-conteudo.visivel {
             display: block;
         }
+
+        /* ========================================== */
+        /* SUB-ABAS (CADASTROS MINIMALISTAS)          */
+        /* ========================================== */
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid var(--borda);
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            color: var(--texto-cinza);
+            cursor: pointer;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: 0.2s;
+        }
+
+        .tab-btn:hover {
+            background-color: var(--azul-claro);
+            color: var(--azul-primario);
+        }
+
+        .tab-btn.ativo {
+            background-color: var(--azul-primario);
+            color: white;
+        }
+
+        .sub-secao {
+            display: none;
+        }
+
+        .sub-secao.visivel {
+            display: block;
+        }
+
+        /* Formulários e Listas */
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--borda);
+            border-radius: 6px;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .input-group input:focus {
+            border-color: var(--azul-primario);
+        }
+
+        .btn-adicionar {
+            background-color: var(--azul-secundario);
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .btn-adicionar:hover {
+            background-color: var(--azul-primario);
+        }
+
+        .lista-cadastros {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .lista-cadastros li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--fundo-tela);
+            padding: 12px 15px;
+            border: 1px solid var(--borda);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            color: var(--texto-escuro);
+        }
+
+        .btn-remover {
+            color: #ef4444;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
     </style>
 </head>
 <body>
@@ -188,11 +292,45 @@
         </div>
 
         <!-- SEÇÃO 2: CADASTROS (Vazia por enquanto) -->
+<!-- SEÇÃO 2: CADASTROS -->
         <div id="secao-cadastros" class="secao-conteudo">
             <div class="header-top">
                 <h1>Gestão de Cadastros</h1>
             </div>
-            <p>O formulário de cadastros entrará aqui em breve.</p>
+
+            <!-- Botões de Navegação Interna -->
+            <div class="tabs-container">
+                <button class="tab-btn ativo" onclick="mudarSubAba('turmas', event)">Turmas</button>
+                <button class="tab-btn" onclick="mudarSubAba('disciplinas', event)">Disciplinas</button>
+                <button class="tab-btn" onclick="mudarSubAba('professores', event)">Professores</button>
+            </div>
+
+            <!-- Categoria: Turmas -->
+            <div id="sub-turmas" class="sub-secao visivel">
+                <div class="input-group">
+                    <input type="text" id="input-turmas" placeholder="Nova turma (Ex: 6º Ano A)">
+                    <button class="btn-adicionar" onclick="adicionarItemMock('turmas')">Adicionar</button>
+                </div>
+                <ul id="lista-turmas" class="lista-cadastros"></ul>
+            </div>
+
+            <!-- Categoria: Disciplinas -->
+            <div id="sub-disciplinas" class="sub-secao">
+                <div class="input-group">
+                    <input type="text" id="input-disciplinas" placeholder="Nova disciplina (Ex: Matemática)">
+                    <button class="btn-adicionar" onclick="adicionarItemMock('disciplinas')">Adicionar</button>
+                </div>
+                <ul id="lista-disciplinas" class="lista-cadastros"></ul>
+            </div>
+
+            <!-- Categoria: Professores -->
+            <div id="sub-professores" class="sub-secao">
+                <div class="input-group">
+                    <input type="text" id="input-professores" placeholder="Novo professor (Ex: Prof. Carlos)">
+                    <button class="btn-adicionar" onclick="adicionarItemMock('professores')">Adicionar</button>
+                </div>
+                <ul id="lista-professores" class="lista-cadastros"></ul>
+            </div>
         </div>
 
         <!-- SEÇÃO 3: GERADOR (Vazia por enquanto) -->
@@ -227,6 +365,38 @@
             if(secaoId === 'cadastros') itensMenu[1].classList.add('ativo');
             if(secaoId === 'gerador') itensMenu[2].classList.add('ativo');
         }
+
+        // Alterna entre as abas internas de Cadastro
+        function mudarSubAba(abaId, evento) {
+            // Esconde os conteúdos
+            document.querySelectorAll('.sub-secao').forEach(el => el.classList.remove('visivel'));
+            // Remove o azul dos botões
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('ativo'));
+
+            // Mostra o selecionado
+            document.getElementById('sub-' + abaId).classList.add('visivel');
+            evento.currentTarget.classList.add('ativo');
+        }
+
+        // Função temporária para visualizarmos a interface funcionando antes de ligar o Python
+        function adicionarItemMock(categoria) {
+            const input = document.getElementById('input-' + categoria);
+            const valor = input.value.trim();
+            
+            if (!valor) return;
+
+            const lista = document.getElementById('lista-' + categoria);
+            const li = document.createElement('li');
+            
+            li.innerHTML = `
+                ${valor} 
+                <button class="btn-remover" onclick="this.parentElement.remove()">✖</button>
+            `;
+            
+            lista.appendChild(li);
+            input.value = ''; // Limpa o campo
+        }
+        
     </script>
 </body>
 </html>
