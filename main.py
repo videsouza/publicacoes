@@ -35,6 +35,17 @@ def inicializar_banco():
             nome TEXT NOT NULL
         )
     ''')
+
+    # 4. Cria a gaveta da Matriz Curricular (Os Vínculos)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS matrizes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            turma_id INTEGER,
+            disciplina_id INTEGER,
+            professor_id INTEGER,
+            aulas INTEGER
+        )
+    ''')
     
     conexao.commit()
     conexao.close()
@@ -72,6 +83,12 @@ class DisciplinaBase(BaseModel):
 
 class ProfessorBase(BaseModel):
     nome: str
+
+class MatrizBase(BaseModel):
+    turma_id: int
+    disciplina_id: int
+    professor_id: int
+    aulas: int
 
 # ============================================================================
 # ROTAS DA API - TURMAS
@@ -178,3 +195,41 @@ def deletar_professor(professor_id: int):
     conexao.commit()
     conexao.close()
     return {"mensagem": "Professor removido!"}
+
+# ============================================================================
+# ROTAS DA API - MATRIZ CURRICULAR (VÍNCULOS)
+# ============================================================================
+@app.get("/api/matrizes")
+def listar_matrizes():
+    conexao = sqlite3.connect("banco_sistema.db")
+    cursor = conexao.cursor()
+    # Puxa os dados cruzando as tabelas para pegar os nomes em vez dos IDs
+    cursor.execute('''
+        SELECT m.id, t.nome, d.nome, p.nome, m.aulas 
+        FROM matrizes m
+        JOIN turmas t ON m.turma_id = t.id
+        JOIN disciplinas d ON m.disciplina_id = d.id
+        JOIN professores p ON m.professor_id = p.id
+    ''')
+    linhas = cursor.fetchall()
+    conexao.close()
+    return [{"id": l[0], "turma": l[1], "disciplina": l[2], "professor": l[3], "aulas": l[4]} for l in linhas]
+
+@app.post("/api/matrizes")
+def criar_matriz(matriz: MatrizBase):
+    conexao = sqlite3.connect("banco_sistema.db")
+    cursor = conexao.cursor()
+    cursor.execute("INSERT INTO matrizes (turma_id, disciplina_id, professor_id, aulas) VALUES (?, ?, ?, ?)", 
+                   (matriz.turma_id, matriz.disciplina_id, matriz.professor_id, matriz.aulas))
+    conexao.commit()
+    conexao.close()
+    return {"mensagem": "Vínculo salvo com sucesso!"}
+
+@app.delete("/api/matrizes/{matriz_id}")
+def deletar_matriz(matriz_id: int):
+    conexao = sqlite3.connect("banco_sistema.db")
+    cursor = conexao.cursor()
+    cursor.execute("DELETE FROM matrizes WHERE id = ?", (matriz_id,))
+    conexao.commit()
+    conexao.close()
+    return {"mensagem": "Vínculo removido!"}
