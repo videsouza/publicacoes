@@ -576,6 +576,7 @@
             if(secaoId === 'gerador') {
                 itensMenu[2].classList.add('ativo');
                 carregarDropdownsMatriz(); // <-- ADICIONE ESTA LINHA AQUI
+                carregarListaMatriz();
             }
         }
 
@@ -833,34 +834,64 @@
             }
         }
 
-        function adicionarVinculo() {
+// ============================================================================
+        // API - MATRIZ CURRICULAR
+        // ============================================================================
+        async function carregarListaMatriz() {
+            const resposta = await fetch('/api/matrizes');
+            const matrizes = await resposta.json();
+            const lista = document.getElementById('lista-matriz');
+            lista.innerHTML = ''; 
+            
+            matrizes.forEach(item => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span style="flex: 1;"><strong>${item.turma}</strong>: ${item.disciplina} com ${item.professor} <em>(${item.aulas} aulas/semana)</em></span>
+                    <button class="btn-remover" onclick="removerVinculoReal(${item.id})">✖</button>
+                `;
+                lista.appendChild(li);
+            });
+        }
+
+        async function adicionarVinculo() {
             const dropdownTurma = document.getElementById('sel-turma');
             const dropdownDisc = document.getElementById('sel-disciplina');
             const dropdownProf = document.getElementById('sel-professor');
             const inputAulas = document.getElementById('qtd-aulas');
 
-            // Verifica se o usuário selecionou tudo
             if (dropdownTurma.value === '' || dropdownDisc.value === '' || dropdownProf.value === '' || !inputAulas.value) {
                 alert("Por favor, preencha todos os campos do vínculo.");
                 return;
             }
 
-            // Pega o texto visível que o usuário escolheu
-            const nomeTurma = dropdownTurma.options[dropdownTurma.selectedIndex].text;
-            const nomeDisc = dropdownDisc.options[dropdownDisc.selectedIndex].text;
-            const nomeProf = dropdownProf.options[dropdownProf.selectedIndex].text;
-            const qtd = inputAulas.value;
+            const dados = {
+                turma_id: parseInt(dropdownTurma.value),
+                disciplina_id: parseInt(dropdownDisc.value),
+                professor_id: parseInt(dropdownProf.value),
+                aulas: parseInt(inputAulas.value)
+            };
 
-            // Cria a linha na tela
-            const lista = document.getElementById('lista-matriz');
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <span style="flex: 1;"><strong>${nomeTurma}</strong>: ${nomeDisc} com ${nomeProf} <em>(${qtd} aulas/semana)</em></span>
-                <button class="btn-remover" onclick="this.parentElement.remove()">✖</button>
-            `;
+            const btn = document.querySelector("#passo-2 .btn-adicionar");
+            btn.disabled = true;
+            btn.innerText = "Salvando...";
+
+            await fetch('/api/matrizes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dados)
+            });
+
+            inputAulas.value = ''; // Limpa apenas a quantidade para facilitar o próximo cadastro
+            btn.disabled = false;
+            btn.innerText = "Vincular";
             
-            lista.appendChild(li);
-            inputAulas.value = ''; // Limpa a quantidade para o próximo vínculo
+            carregarListaMatriz();
+        }
+
+        async function removerVinculoReal(id) {
+            if (!confirm("Remover este vínculo da matriz?")) return;
+            await fetch(`/api/matrizes/${id}`, { method: 'DELETE' });
+            carregarListaMatriz();
         }
         
     </script>
