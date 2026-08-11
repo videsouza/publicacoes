@@ -94,6 +94,16 @@ def criar_turma(turma: TurmaBase):
     
     return {"mensagem": "Turma salva com sucesso!"}
 
+# Rota para DELETAR uma turma
+@app.delete("/api/turmas/{turma_id}")
+def deletar_turma(turma_id: int):
+    conexao = sqlite3.connect("banco_sistema.db")
+    cursor = conexao.cursor()
+    cursor.execute("DELETE FROM turmas WHERE id = ?", (turma_id,))
+    conexao.commit()
+    conexao.close()
+    
+    return {"mensagem": "Turma removida com sucesso!"}
 
 # ============================================================================
 # 2. ROTAS VISUAIS (Frontend)
