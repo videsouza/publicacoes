@@ -404,7 +404,7 @@
             <div id="sub-turmas" class="sub-secao visivel">
                 <div class="input-group">
                     <input type="text" id="input-turmas" placeholder="Nova turma (Ex: 6º Ano A)">
-                    <button class="btn-adicionar" onclick="adicionarItemMock('turmas')">Adicionar</button>
+                    <button class="btn-adicionar" onclick="salvarTurmaReal()">Adicionar</button>
                 </div>
                 <ul id="lista-turmas" class="lista-cadastros"></ul>
             </div>
@@ -644,6 +644,67 @@
             
             corpo.appendChild(linha);
         }
+
+        // ============================================================================
+        // COMUNICAÇÃO COM O SERVIDOR (API REAL)
+        // ============================================================================
+
+        // 1. Busca as turmas no Python e desenha na tela
+        async function carregarTurmas() {
+            try {
+                const resposta = await fetch('/api/turmas');
+                const turmas = await resposta.json();
+                
+                const lista = document.getElementById('lista-turmas');
+                lista.innerHTML = ''; // Limpa a lista antes de preencher
+                
+                turmas.forEach(turma => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        ${turma.nome} 
+                        <button class="btn-remover">✖</button>
+                    `;
+                    lista.appendChild(li);
+                });
+            } catch (erro) {
+                console.error("Erro ao buscar turmas do banco:", erro);
+            }
+        }
+
+        // 2. Pega o texto da tela e envia para o banco de dados
+        async function salvarTurmaReal() {
+            const input = document.getElementById('input-turmas');
+            const nomeTurma = input.value.trim();
+            
+            if (!nomeTurma) return;
+            
+            input.disabled = true; // Trava o campo para evitar duplo clique
+            input.placeholder = "Salvando...";
+
+            try {
+                const resposta = await fetch('/api/turmas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nome: nomeTurma })
+                });
+
+                if (resposta.ok) {
+                    input.value = ''; // Limpa o campo
+                    carregarTurmas(); // Recarrega a lista trazendo do banco real
+                } else {
+                    alert("Erro ao salvar no servidor.");
+                }
+            } catch (erro) {
+                alert("Falha de comunicação com a API.");
+            } finally {
+                input.disabled = false; // Destrava o campo
+                input.placeholder = "Nova turma (Ex: 6º Ano A)";
+                input.focus();
+            }
+        }
+
+        // 3. Gatilho automático: Carrega as turmas assim que a página abrir
+        window.addEventListener('DOMContentLoaded', carregarTurmas);
         
     </script>
 </body>
