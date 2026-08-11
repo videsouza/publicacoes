@@ -3,93 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema - Nova Versão</title>
+    <title>Hub do Sistema - Gerador de Grade</title>
     <style>
+        /* ========================================== */
+        /* VARIÁVEIS DE COR E ESTILO BASE             */
+        /* ========================================== */
+        :root {
+            --azul-primario: #1e40af;
+            --azul-secundario: #2563eb;
+            --azul-claro: #eff6ff;
+            --fundo-tela: #f8fafc;
+            --texto-escuro: #0f172a;
+            --texto-cinza: #64748b;
+            --borda: #e2e8f0;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f6f9;
-            color: #333;
+            background-color: var(--fundo-tela);
+            color: var(--texto-escuro);
             margin: 0;
             padding: 0;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
         }
 
-        .hub-container {
-            background-color: #ffffff;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-            text-align: center;
-            border-top: 5px solid #0d47a1; /* Azul Principal */
-            max-width: 500px;
-            width: 100%;
-        }
-
-        h1 {
-            color: #0d47a1;
-            margin-bottom: 10px;
-        }
-
-        p {
-            color: #64748b;
-            margin-bottom: 30px;
-        }
-
-        button {
-            background-color: #1565c0;
+        /* ========================================== */
+        /* BARRA LATERAL (SIDEBAR)                    */
+        /* ========================================== */
+        .sidebar {
+            width: 250px;
+            background-color: var(--azul-primario);
             color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-size: 16px;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .menu-item {
+            padding: 15px 20px;
+            color: #bfdbfe;
+            text-decoration: none;
+            display: block;
+            transition: 0.2s;
             cursor: pointer;
-            transition: background-color 0.2s;
+            border-left: 4px solid transparent;
         }
 
-        button:hover {
-            background-color: #0a3d91;
+        .menu-item:hover, .menu-item.ativo {
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+            border-left-color: white;
         }
 
-        #resultado {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #e3f2fd;
-            color: #0d47a1;
-            border-radius: 6px;
+        /* ========================================== */
+        /* ÁREA PRINCIPAL (HUB)                       */
+        /* ========================================== */
+        .main-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .header-top h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            color: var(--texto-escuro);
+        }
+
+        /* LAYOUT EM GRID PARA OS MÓDULOS */
+        .grid-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .card-modulo {
+            background: white;
+            border: 1px solid var(--borda);
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .card-modulo:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(37, 99, 235, 0.1);
+            border-color: var(--azul-secundario);
+        }
+
+        .card-modulo h3 {
+            margin: 0 0 10px 0;
+            color: var(--azul-primario);
+            font-size: 1.2rem;
+        }
+
+        .card-modulo p {
+            margin: 0;
+            color: var(--texto-cinza);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        /* ========================================== */
+        /* SEÇÕES OCULTAS (Para navegação)            */
+        /* ========================================== */
+        .secao-conteudo {
             display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid var(--borda);
+        }
+
+        .secao-conteudo.visivel {
+            display: block;
         }
     </style>
 </head>
 <body>
 
-    <div class="hub-container">
-        <h1>Sistema Inicializado</h1>
-        <p>A fundação está limpa e pronta para receber as novas funcionalidades.</p>
-        
-        <button onclick="testarConexao()">Testar Conexão com o Python</button>
-        
-        <div id="resultado"></div>
-    </div>
+    <!-- Menu Lateral -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h2>Sistema Base 2.0</h2>
+        </div>
+        <div class="menu-item ativo" onclick="navegarPara('hub')">
+            📊 Hub Principal
+        </div>
+        <div class="menu-item" onclick="navegarPara('cadastros')">
+            📋 Cadastros
+        </div>
+        <div class="menu-item" onclick="navegarPara('gerador')">
+            📅 Gerador de Grade
+        </div>
+    </nav>
 
+    <!-- Conteúdo Principal -->
+    <main class="main-content">
+        
+        <!-- SEÇÃO 1: HUB PRINCIPAL (Painel) -->
+        <div id="secao-hub" class="secao-conteudo visivel">
+            <div class="header-top">
+                <h1>Painel de Controle</h1>
+            </div>
+
+            <div class="grid-dashboard">
+                <div class="card-modulo" onclick="navegarPara('cadastros')">
+                    <h3>🏫 Turmas & Disciplinas</h3>
+                    <p>Gerencie o cadastro base da escola. Adicione as turmas e as matérias que serão lecionadas.</p>
+                </div>
+                
+                <div class="card-modulo" onclick="navegarPara('cadastros')">
+                    <h3>👨‍🏫 Corpo Docente</h3>
+                    <p>Cadastre os professores e defina suas restrições de horários e carga horária máxima.</p>
+                </div>
+
+                <div class="card-modulo" onclick="navegarPara('gerador')">
+                    <h3>⚙️ Motor de Geração</h3>
+                    <p>Acesse a inteligência artificial para cruzar os dados e montar a grade escolar perfeita.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO 2: CADASTROS (Vazia por enquanto) -->
+        <div id="secao-cadastros" class="secao-conteudo">
+            <div class="header-top">
+                <h1>Gestão de Cadastros</h1>
+            </div>
+            <p>O formulário de cadastros entrará aqui em breve.</p>
+        </div>
+
+        <!-- SEÇÃO 3: GERADOR (Vazia por enquanto) -->
+        <div id="secao-gerador" class="secao-conteudo">
+            <div class="header-top">
+                <h1>Gerador de Grade Escolar</h1>
+            </div>
+            <p>O painel de processamento matemático entrará aqui em breve.</p>
+        </div>
+
+    </main>
+
+    <!-- Lógica de Navegação Limpa -->
     <script>
-        async function testarConexao() {
-            const divResultado = document.getElementById('resultado');
-            divResultado.style.display = 'block';
-            divResultado.innerText = "Conectando...";
+        function navegarPara(secaoId) {
+            // 1. Esconde todas as seções
+            document.querySelectorAll('.secao-conteudo').forEach(secao => {
+                secao.classList.remove('visivel');
+            });
 
-            try {
-                const resposta = await fetch('/api/status');
-                const dados = await resposta.json();
-                divResultado.innerText = `Sucesso: ${dados.status} (Versão ${dados.versao})`;
-            } catch (erro) {
-                divResultado.style.backgroundColor = '#fee2e2';
-                divResultado.style.color = '#b91c1c';
-                divResultado.innerText = "Erro ao conectar com o servidor.";
-            }
+            // 2. Remove o destaque de todos os itens do menu
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.classList.remove('ativo');
+            });
+
+            // 3. Mostra a seção clicada
+            document.getElementById('secao-' + secaoId).classList.add('visivel');
+
+            // 4. Adiciona o destaque no menu correspondente (simplificado)
+            const itensMenu = document.querySelectorAll('.menu-item');
+            if(secaoId === 'hub') itensMenu[0].classList.add('ativo');
+            if(secaoId === 'cadastros') itensMenu[1].classList.add('ativo');
+            if(secaoId === 'gerador') itensMenu[2].classList.add('ativo');
         }
     </script>
 </body>
