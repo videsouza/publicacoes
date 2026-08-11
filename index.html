@@ -456,12 +456,73 @@
                                 <th>Ação</th>
                             </tr>
                         </thead>
-                        <tbody id="corpo-periodos">
+<tbody id="corpo-periodos">
+                            <!-- 1ª Aula -->
                             <tr>
-                                <td><input type="time" style="padding: 5px;"> às <input type="time" style="padding: 5px;"></td>
+                                <td><input type="time" value="07:00" style="padding: 5px;"> às <input type="time" value="07:50" style="padding: 5px;"></td>
+                                <td>
+                                    <select style="padding: 5px;">
+                                        <option selected>Período de Aula</option>
+                                        <option>Intervalo / Recreio</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
+                            </tr>
+                            
+                            <!-- 2ª Aula -->
+                            <tr>
+                                <td><input type="time" value="07:50" style="padding: 5px;"> às <input type="time" value="08:40" style="padding: 5px;"></td>
+                                <td>
+                                    <select style="padding: 5px;">
+                                        <option selected>Período de Aula</option>
+                                        <option>Intervalo / Recreio</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
+                            </tr>
+
+                            <!-- 3ª Aula -->
+                            <tr>
+                                <td><input type="time" value="08:40" style="padding: 5px;"> às <input type="time" value="09:30" style="padding: 5px;"></td>
+                                <td>
+                                    <select style="padding: 5px;">
+                                        <option selected>Período de Aula</option>
+                                        <option>Intervalo / Recreio</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
+                            </tr>
+
+                            <!-- Intervalo (Recreio) -->
+                            <tr style="background-color: var(--azul-claro);">
+                                <td><input type="time" value="09:30" style="padding: 5px;"> às <input type="time" value="09:50" style="padding: 5px;"></td>
                                 <td>
                                     <select style="padding: 5px;">
                                         <option>Período de Aula</option>
+                                        <option selected>Intervalo / Recreio</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
+                            </tr>
+
+                            <!-- 4ª Aula -->
+                            <tr>
+                                <td><input type="time" value="09:50" style="padding: 5px;"> às <input type="time" value="10:40" style="padding: 5px;"></td>
+                                <td>
+                                    <select style="padding: 5px;">
+                                        <option selected>Período de Aula</option>
+                                        <option>Intervalo / Recreio</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
+                            </tr>
+
+                            <!-- 5ª Aula -->
+                            <tr>
+                                <td><input type="time" value="10:40" style="padding: 5px;"> às <input type="time" value="11:30" style="padding: 5px;"></td>
+                                <td>
+                                    <select style="padding: 5px;">
+                                        <option selected>Período de Aula</option>
                                         <option>Intervalo / Recreio</option>
                                     </select>
                                 </td>
