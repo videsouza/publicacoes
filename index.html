@@ -393,6 +393,18 @@
                 <h1>Gestão de Cadastros</h1>
             </div>
 
+            <!-- Painel de Importação Excel -->
+            <div style="margin-bottom: 30px; padding: 20px; background: var(--azul-claro); border-radius: 8px; border: 1px dashed var(--azul-primario); display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <h4 style="margin: 0 0 5px 0; color: var(--azul-primario);">Importação em Lote (Excel)</h4>
+                    <p style="margin: 0; font-size: 0.9em; color: var(--texto-cinza);">Carregue uma planilha com as colunas: TURMAS, DISCIPLINAS e PROFESSORES.</p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="file" id="arquivo-excel" accept=".xlsx, .xls" style="padding: 8px; background: white; border: 1px solid var(--borda); border-radius: 6px;">
+                    <button class="btn-adicionar" onclick="importarExcel()" id="btn-importar">Carregar Dados</button>
+                </div>
+            </div>
+
             <!-- Botões de Navegação Interna -->
             <div class="tabs-container">
                 <button class="tab-btn ativo" onclick="mudarSubAba('turmas', event)">Turmas</button>
@@ -1071,6 +1083,51 @@
 
                 container.appendChild(tabela);
             });
+        }
+
+        // ============================================================================
+        // MOTOR DE IMPORTAÇÃO EXCEL
+        // ============================================================================
+        async function importarExcel() {
+            const fileInput = document.getElementById('arquivo-excel');
+            if (fileInput.files.length === 0) {
+                alert("Por favor, selecione um arquivo Excel primeiro.");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            const btn = document.getElementById("btn-importar");
+            btn.innerText = "Processando...";
+            btn.disabled = true;
+
+            try {
+                const resposta = await fetch('/api/upload-cadastros', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const resultado = await resposta.json();
+                
+                if (resposta.ok) {
+                    alert(`${resultado.mensagem}\n\nRegistros adicionados:\n🎓 Turmas: ${resultado.resumo.turmas}\n📚 Disciplinas: ${resultado.resumo.disciplinas}\n👨‍🏫 Professores: ${resultado.resumo.professores}`);
+                    
+                    // Recarrega as três listas visuais
+                    carregarTurmas();
+                    carregarDisciplinas();
+                    carregarProfessores();
+                    
+                    fileInput.value = ''; // Limpa o campo do arquivo
+                } else {
+                    alert("Erro ao processar a planilha.");
+                }
+            } catch (erro) {
+                alert("Falha de comunicação na importação do arquivo.");
+            } finally {
+                btn.innerText = "Carregar Dados";
+                btn.disabled = false;
+            }
         }
         
     </script>
