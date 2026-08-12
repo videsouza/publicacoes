@@ -431,13 +431,46 @@ def gerar_grade_mestra():
                 if aulas_prof_turma_dia:
                     modelo.Add(sum(aulas_prof_turma_dia) <= 2)
 
-    # C4. Dispersão Uniforme (Opcional, mas recomendado manter)
-    # Impede que a mesma turma tenha mais de 2 aulas da MESMA disciplina no dia
-    # (Trabalha em conjunto com a C3 caso uma turma tenha mais de 1 professor para a mesma matéria)
+   # C3. Controle de Fadiga (Regra Personalizada)
+    # Garante que o professor dê no máximo 2 aulas para a MESMA turma por dia.
+    for d in dias:
+        for prof in professores_unicos:
+            for turma in turmas_unicas:
+                aulas_prof_turma_dia = [
+                    grade[(m[0], d, p)] 
+                    for m in matriz if m[3] == prof and m[1] == turma 
+                    for p in periodos
+                ]
+                if aulas_prof_turma_dia:
+                    modelo.Add(sum(aulas_prof_turma_dia) <= 2)
+
+    # C4. Dobradinhas e Dispersão Uniforme
+    # Substituímos a trava genérica por Padrões Permitidos (Allowed Assignments).
+    padroes_permitidos = []
+    
+    # Cenário A: 0 aulas no dia
+    padroes_permitidos.append([0, 0, 0, 0, 0, 0])
+    
+    # Cenário B: 1 aula isolada (Pode cair em qualquer um dos 6 horários)
+    for p in range(6):
+        padrao = [0] * 6
+        padrao[p] = 1
+        padroes_permitidos.append(padrao)
+        
+    # Cenário C: 2 aulas seguidas (Dobradinha)
+    for p in range(5):
+        if p == 2:
+            continue # Bloqueia a dobradinha que atravessa o recreio (Horários 2 e 3 na contagem do Python)
+        padrao = [0] * 6
+        padrao[p] = 1
+        padrao[p+1] = 1
+        padroes_permitidos.append(padrao)
+
+    # Aplica a regra de padrões para cada vínculo da matriz em todos os dias
     for d in dias:
         for m in matriz:
-            aulas_no_dia = [grade[(m[0], d, p)] for p in periodos]
-            modelo.Add(sum(aulas_no_dia) <= 2)
+            aulas_no_dia = [grade[(m[0], d, p)] for p in range(6)]
+            modelo.AddAllowedAssignments(aulas_no_dia, padroes_permitidos)
 
     # ------------------------------------------------------------------------
     # PASSO D: RESOLVER O QUEBRA-CABEÇA
