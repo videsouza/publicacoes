@@ -315,7 +315,7 @@ def gerar_grade_mestra():
     
     # Dimensões padrão: 5 dias da semana (Seg-Sex), 5 períodos por dia
     dias = range(5)
-    periodos = range(5)
+    periodos = range(6)
     
     # ------------------------------------------------------------------------
     # PASSO A: CRIANDO AS VARIÁVEIS (A Grade em Branco)
