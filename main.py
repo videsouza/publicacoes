@@ -304,6 +304,27 @@ def gerar_grade_mestra():
                 aulas_do_prof = [grade[(m[0], d, p)] for m in matriz if m[3] == prof]
                 modelo.AddAtMostOne(aulas_do_prof)
 
+
+    # C3. Controle de Fadiga (Professor não pode dar 4 aulas seguidas)
+    # Pegamos janelas de 4 períodos. O professor pode ocupar no máximo 3 espaços nela.
+    for d in dias:
+        for prof in professores_unicos:
+            # Janela 1: Horários 1, 2, 3 e 4 (índices 0, 1, 2, 3)
+            aulas_janela_1 = [grade[(m[0], d, p)] for m in matriz if m[3] == prof for p in [0, 1, 2, 3]]
+            modelo.Add(sum(aulas_janela_1) <= 3)
+            
+            # Janela 2: Horários 2, 3, 4 e 5 (índices 1, 2, 3, 4)
+            aulas_janela_2 = [grade[(m[0], d, p)] for m in matriz if m[3] == prof for p in [1, 2, 3, 4]]
+            modelo.Add(sum(aulas_janela_2) <= 3)
+
+    # C4. Dispersão Uniforme (Evitar massificação de aulas)
+    # Impede que a mesma turma tenha mais de 2 aulas da MESMA disciplina no mesmo dia.
+    for d in dias:
+        for m in matriz:
+            # m[0] é a ID do vínculo (Turma + Disciplina + Professor)
+            aulas_no_dia = [grade[(m[0], d, p)] for p in periodos]
+            modelo.Add(sum(aulas_no_dia) <= 2)
+
     # ------------------------------------------------------------------------
     # PASSO D: RESOLVER O QUEBRA-CABEÇA
     # ------------------------------------------------------------------------
