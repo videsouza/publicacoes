@@ -396,7 +396,7 @@ def gerar_grade_mestra():
         modelo.Add(sum(grade[(m_id, d, p)] for d in dias for p in periodos) == qtd_aulas)
 
     # ------------------------------------------------------------------------
-    # PASSO C: REGRAS DE COLISÃO (Ocupação de Espaço Físico)
+    # PASSO C: REGRAS DE COLISÃO E RESTRIÇÕES
     # ------------------------------------------------------------------------
     
     # C1. Uma TURMA só pode ter no máximo 1 aula por horário
@@ -415,24 +415,27 @@ def gerar_grade_mestra():
                 aulas_do_prof = [grade[(m[0], d, p)] for m in matriz if m[3] == prof]
                 modelo.AddAtMostOne(aulas_do_prof)
 
-
-    # C3. Controle de Fadiga (Professor não pode dar 4 aulas seguidas)
-    # Pegamos janelas de 4 períodos. O professor pode ocupar no máximo 3 espaços nela.
+    # C3. Controle de Fadiga (Regra Personalizada)
+    # O limite diário de 6 aulas já é garantido pelos 6 períodos.
+    # Esta regra garante que o professor dê no máximo 2 aulas para a MESMA turma por dia.
     for d in dias:
         for prof in professores_unicos:
-            # Janela 1: Horários 1, 2, 3 e 4 (índices 0, 1, 2, 3)
-            aulas_janela_1 = [grade[(m[0], d, p)] for m in matriz if m[3] == prof for p in [0, 1, 2, 3]]
-            modelo.Add(sum(aulas_janela_1) <= 3)
-            
-            # Janela 2: Horários 2, 3, 4 e 5 (índices 1, 2, 3, 4)
-            aulas_janela_2 = [grade[(m[0], d, p)] for m in matriz if m[3] == prof for p in [1, 2, 3, 4]]
-            modelo.Add(sum(aulas_janela_2) <= 3)
+            for turma in turmas_unicas:
+                # Coleta todas as aulas que este professor dará para esta turma neste dia
+                aulas_prof_turma_dia = [
+                    grade[(m[0], d, p)] 
+                    for m in matriz if m[3] == prof and m[1] == turma 
+                    for p in periodos
+                ]
+                # Se existe vínculo, aplica a trava de limite máximo = 2
+                if aulas_prof_turma_dia:
+                    modelo.Add(sum(aulas_prof_turma_dia) <= 2)
 
-    # C4. Dispersão Uniforme (Evitar massificação de aulas)
-    # Impede que a mesma turma tenha mais de 2 aulas da MESMA disciplina no mesmo dia.
+    # C4. Dispersão Uniforme (Opcional, mas recomendado manter)
+    # Impede que a mesma turma tenha mais de 2 aulas da MESMA disciplina no dia
+    # (Trabalha em conjunto com a C3 caso uma turma tenha mais de 1 professor para a mesma matéria)
     for d in dias:
         for m in matriz:
-            # m[0] é a ID do vínculo (Turma + Disciplina + Professor)
             aulas_no_dia = [grade[(m[0], d, p)] for p in periodos]
             modelo.Add(sum(aulas_no_dia) <= 2)
 
