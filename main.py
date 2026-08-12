@@ -1,6 +1,7 @@
 import sqlite3
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from ortools.sat.python import cp_model
 
 app = FastAPI(title="Sistema Base 2.0")
 
@@ -233,3 +234,41 @@ def deletar_matriz(matriz_id: int):
     conexao.commit()
     conexao.close()
     return {"mensagem": "Vínculo removido!"}
+
+# ============================================================================
+# ROTAS DA API - MOTOR DE GERAÇÃO DE GRADE (OR-TOOLS)
+# ============================================================================
+@app.post("/api/gerar-grade")
+def gerar_grade_mestra():
+    conexao = sqlite3.connect("banco_sistema.db")
+    cursor = conexao.cursor()
+    
+    # 1. Busca as regras do jogo (Matriz Curricular)
+    cursor.execute('''
+        SELECT m.id, t.nome, d.nome, p.nome, m.aulas 
+        FROM matrizes m
+        JOIN turmas t ON m.turma_id = t.id
+        JOIN disciplinas d ON m.disciplina_id = d.id
+        JOIN professores p ON m.professor_id = p.id
+    ''')
+    matriz = cursor.fetchall()
+    conexao.close()
+
+    if not matriz:
+        return {"erro": "A matriz curricular está vazia. Adicione vínculos no Passo 2."}
+
+    # 2. Inicializa o Cérebro do OR-Tools
+    modelo = cp_model.CpModel()
+    
+    # ------------------------------------------------------------------------
+    # O espaço onde a mágica matemática vai acontecer nas próximas etapas:
+    # - Criação das Variáveis (Dias, Horários, Professores)
+    # - Restrições Rígidas (Ex: Professor não pode dar duas aulas ao mesmo tempo)
+    # - Restrições Flexíveis (Ex: Evitar janelas e fadiga)
+    # ------------------------------------------------------------------------
+
+    # 3. Retorno temporário para testarmos a conexão da tela com o Python
+    return {
+        "mensagem": "Motor OR-Tools acionado com sucesso!",
+        "dados_lidos": len(matriz)
+    }
