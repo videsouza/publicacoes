@@ -587,22 +587,18 @@
             <!-- PASSO 3: Regras e IA -->
             <div id="passo-3" class="passo-conteudo">
                 <h3 style="color: var(--azul-primario);">Configuração do Algoritmo</h3>
-                <p>Selecione as regras matemáticas que a Inteligência do sistema deve respeitar.</p>
+                <p>Selecione as disciplinas que devem ter <strong>prioridade máxima</strong> para formar dobradinhas (blocos de 2 aulas seguidas).</p>
                 
                 <div style="background: var(--fundo-tela); padding: 20px; border-radius: 8px; border: 1px solid var(--borda);">
-                    <label style="display: block; margin-bottom: 15px;">
-                        <input type="checkbox" checked disabled> <strong>Dobradinhas Inteligentes:</strong> Permite blocos de duas aulas seguidas, respeitando o intervalo do recreio.
-                    </label>
-                    <label style="display: block; margin-bottom: 15px;">
-                        <input type="checkbox" checked disabled> <strong>Dispersão Uniforme:</strong> Impede que a mesma matéria se repita exaustivamente no mesmo dia.
-                    </label>
-                    <label style="display: block;">
-                        <input type="checkbox" checked disabled> <strong>Controle de Carga:</strong> Garante limite máximo de 2 aulas por dia do mesmo professor na mesma turma.
-                    </label>
+                    <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--azul-primario);">Disciplinas Prioritárias:</h4>
+                    
+                    <!-- Os botões das disciplinas vão aparecer aqui automaticamente -->
+                    <div id="lista-prioridades" style="display: flex; flex-wrap: wrap; gap: 15px;"></div>
+                    
                 </div>
 
-                <button class="btn-wizard voltar" onclick="mudarPasso(3, 2)">🡠 Voltar</button>
-                <button class="btn-wizard" style="background-color: #10b981;" onclick="dispararMotorIA()">⚙️ Gerar Grade Mestra</button>
+                <button class="btn-wizard voltar" style="margin-top: 20px;" onclick="mudarPasso(3, 2)">🡠 Voltar</button>
+                <button class="btn-wizard" style="background-color: #10b981; margin-top: 20px;" onclick="dispararMotorIA()">⚙️ Gerar Grade Mestra</button>
                 <div style="clear: both;"></div>
             </div>
 
@@ -820,6 +816,24 @@
             });
         }
 
+        async function carregarPrioridades() {
+            try {
+                const resposta = await fetch('/api/disciplinas');
+                const disciplinas = await resposta.json();
+                
+                const container = document.getElementById('lista-prioridades');
+                container.innerHTML = '';
+                
+                disciplinas.forEach(d => {
+                    container.innerHTML += `
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 5px 10px; background: white; border: 1px solid var(--borda); border-radius: 4px;">
+                            <input type="checkbox" value="${d.nome}"> <strong>${d.nome}</strong>
+                        </label>
+                    `;
+                });
+            } catch (erro) {}
+        }
+
         async function salvarDisciplinaReal() {
             const input = document.getElementById('input-disciplinas');
             const nome = input.value.trim();
@@ -883,6 +897,7 @@
          carregarTurmas();
          carregarDisciplinas();
          carregarProfessores();
+         carregarPrioridades();
      });
 
     // ============================================================================
@@ -988,11 +1003,19 @@
             const btn = document.querySelector("#passo-3 .btn-wizard[style*='10b981']");
             const textoOriginal = btn.innerHTML;
             
-            btn.innerHTML = "⚙️ Processando IA...";
+            btn.innerHTML = "⚙️ Processando Otimização...";
             btn.disabled = true;
 
+            // Mapeia todos os botões que o coordenador marcou
+            const prioridadesMarcadas = Array.from(document.querySelectorAll('#lista-prioridades input:checked')).map(cb => cb.value);
+
             try {
-                const resposta = await fetch('/api/gerar-grade', { method: 'POST' });
+                const resposta = await fetch('/api/gerar-grade', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }, // Avisa o Python que estamos enviando dados
+                    body: JSON.stringify({ prioridades: prioridadesMarcadas }) 
+                });
+                
                 const resultado = await resposta.json();
 
                 if (resultado.erro) {
@@ -1002,11 +1025,7 @@
                     return;
                 }
 
-                // -> A MÁGICA ACONTECE AQUI <-
-                // Envia os dados resolvidos pela Inteligência para a nossa função visual
                 desenharGrade(resultado.grade);
-                
-                // Avança visualmente para o Passo 4 (Resultado)
                 mudarPasso(3, 4);
 
             } catch (erro) {
