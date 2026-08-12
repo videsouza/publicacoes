@@ -529,9 +529,21 @@
                                 <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
                             </tr>
 
-                            <!-- 5ª Aula -->
+                        <!-- 5ª Aula -->
                             <tr>
-                                <td><input type="time" value="10:35" style="padding: 5px;"> às <input type="time" value="11:25" style="padding: 5px;"></td>
+                                <td><input type="time" value="10:40" style="padding: 5px;"> às <input type="time" value="11:25" style="padding: 5px;"></td>
+                                <td>
+                                    <select style="padding: 5px;">
+                                        <option selected>Período de Aula</option>
+                                        <option>Intervalo / Recreio</option>
+                                    </select>
+                                </td>
+                                <td><button class="btn-remover" onclick="this.closest('tr').remove()">✖</button></td>
+                            </tr>
+
+                            <!-- 6ª Aula -->
+                            <tr>
+                                <td><input type="time" value="11:25" style="padding: 5px;"> às <input type="time" value="12:15" style="padding: 5px;"></td>
                                 <td>
                                     <select style="padding: 5px;">
                                         <option selected>Período de Aula</option>
@@ -1045,8 +1057,8 @@
 
                 const tbody = tabela.querySelector('tbody');
 
-                // Percorre os 5 períodos de aula diários
-                for (let p = 0; p < 5; p++) {
+                // Percorre os 6 períodos de aula diários
+                for (let p = 0; p < 6; p++) {
                     // Adiciona a linha do intervalo após o 3º período
                     if (p === 3) {
                         const trIntervalo = document.createElement('tr');
