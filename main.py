@@ -201,54 +201,112 @@ def deletar_professor(professor_id: int):
     return {"mensagem": "Professor removido!"}
 
 # ============================================================================
-# ROTA DE IMPORTAÇÃO EM LOTE (EXCEL) - MODO SUBSTITUIÇÃO TOTAL
+# ROTA DE IMPORTAÇÃO EM LOTE (EXCEL 2 PLANILHAS) - MODO SUBSTITUIÇÃO TOTAL
 # ============================================================================
 @app.post("/api/upload-cadastros")
 async def upload_cadastros(file: UploadFile = File(...)):
     conteudo = await file.read()
     
-    # Lê a planilha usando o Pandas
-    df = pd.read_excel(io.BytesIO(conteudo))
-    df.columns = df.columns.str.strip().str.upper()
+    # 1. Lê as duas abas da planilha (0 = Planilha1, 1 = Planilha2)
+    try:
+        df_prof = pd.read_excel(io.BytesIO(conteudo), sheet_name=0)
+        df_aulas = pd.read_excel(io.BytesIO(conteudo), sheet_name=1)
+    except Exception as e:
+        return {"erro": "Certifique-se de que o arquivo Excel possui as duas abas (Planilha1 e Planilha2)."}
+
+    # Padroniza os nomes das colunas (remove espaços extras e deixa maiúsculo)
+    df_prof.rename(columns=lambda x: str(x).strip().upper(), inplace=True)
+    df_aulas.rename(columns=lambda x: str(x).strip().upper(), inplace=True)
     
+    if 'TURMA' not in df_prof.columns:
+        return {"erro": "A Planilha1 precisa ter uma coluna chamada 'TURMA'."}
+
     conexao = sqlite3.connect("banco_sistema.db")
     cursor = conexao.cursor()
     
-    # 1. LIMPEZA TOTAL ANTES DA IMPORTAÇÃO
-    # Apaga todos os registros antigos para iniciar um cadastro limpo
+    # 2. LIMPEZA TOTAL ANTES DA IMPORTAÇÃO
     cursor.execute("DELETE FROM turmas")
     cursor.execute("DELETE FROM disciplinas")
     cursor.execute("DELETE FROM professores")
-    # Também apagamos a matriz para evitar que ela fique procurando IDs que não existem mais
     cursor.execute("DELETE FROM matrizes") 
     
-    resumo = {"turmas": 0, "disciplinas": 0, "professores": 0}
+    # Conjuntos para garantir que não teremos dados duplicados
+    turmas_set = set()
+    professores_set = set()
+    disciplinas_set = set(col for col in df_prof.columns if col != 'TURMA')
     
-    # 2. Processa a coluna TURMAS
-    if 'TURMAS' in df.columns:
-        turmas = df['TURMAS'].dropna().unique()
-        for t in turmas:
-            cursor.execute("INSERT INTO turmas (nome) VALUES (?)", (str(t).strip(),))
-            resumo["turmas"] += 1
+    # 3. MAPEAMENTO DE DADOS BASE (Turmas e Professores)
+    for index, row in df_prof.iterrows():
+        turma = str(row['TURMA']).strip()
+        if pd.isna(turma) or not turma or turma.lower() == 'nan': 
+            continue
+        turmas_set.add(turma)
+        
+        for disc in disciplinas_set:
+            prof = str(row.get(disc, '')).strip()
+            if prof and prof.lower() != 'nan':
+                professores_set.add(prof)
+
+    # 4. SALVANDO DADOS BASE E GUARDANDO OS IDs
+    mapa_turmas = {}
+    for t in turmas_set:
+        cursor.execute("INSERT INTO turmas (nome) VALUES (?)", (t,))
+        mapa_turmas[t] = cursor.lastrowid
+        
+    mapa_disc = {}
+    for d in disciplinas_set:
+        cursor.execute("INSERT INTO disciplinas (nome) VALUES (?)", (d,))
+        mapa_disc[d] = cursor.lastrowid
+        
+    mapa_prof = {}
+    for p in professores_set:
+        cursor.execute("INSERT INTO professores (nome) VALUES (?)", (p,))
+        mapa_prof[p] = cursor.lastrowid
+
+    # 5. CRUZAMENTO DE DADOS (Criando os vínculos da Matriz)
+    vinculos_criados = 0
+    for index, row_prof in df_prof.iterrows():
+        turma_nome = str(row_prof['TURMA']).strip()
+        if turma_nome not in mapa_turmas: continue
+        
+        # Procura a mesma turma na Planilha 2 (Quantidade de aulas)
+        row_aulas = df_aulas[df_aulas['TURMA'].astype(str).str.strip() == turma_nome]
+        if row_aulas.empty: continue
+        row_aulas = row_aulas.iloc[0] # Pega a linha correspondente
+        
+        # Para cada disciplina, verifica o professor e a quantidade de aulas
+        for disc_nome in disciplinas_set:
+            prof_nome = str(row_prof.get(disc_nome, '')).strip()
+            aulas_val = row_aulas.get(disc_nome, 0)
             
-    # 3. Processa a coluna DISCIPLINAS
-    if 'DISCIPLINAS' in df.columns:
-        disciplinas = df['DISCIPLINAS'].dropna().unique()
-        for d in disciplinas:
-            cursor.execute("INSERT INTO disciplinas (nome) VALUES (?)", (str(d).strip(),))
-            resumo["disciplinas"] += 1
-            
-    # 4. Processa a coluna PROFESSORES
-    if 'PROFESSORES' in df.columns:
-        professores = df['PROFESSORES'].dropna().unique()
-        for p in professores:
-            cursor.execute("INSERT INTO professores (nome) VALUES (?)", (str(p).strip(),))
-            resumo["professores"] += 1
-            
+            try:
+                qtd_aulas = int(float(aulas_val))
+            except:
+                qtd_aulas = 0
+                
+            # Se existe um professor válido e a quantidade de aulas é maior que zero, cria o vínculo
+            if prof_nome and prof_nome.lower() != 'nan' and qtd_aulas > 0:
+                t_id = mapa_turmas[turma_nome]
+                d_id = mapa_disc[disc_nome]
+                p_id = mapa_prof[prof_nome]
+                
+                cursor.execute(
+                    "INSERT INTO matrizes (turma_id, disciplina_id, professor_id, aulas) VALUES (?, ?, ?, ?)", 
+                    (t_id, d_id, p_id, qtd_aulas)
+                )
+                vinculos_criados += 1
+
     conexao.commit()
     conexao.close()
     
-    return {"mensagem": "Registros antigos apagados e importação concluída!", "resumo": resumo}
+    resumo = {
+        "turmas": len(turmas_set),
+        "disciplinas": len(disciplinas_set),
+        "professores": len(professores_set),
+        "vinculos": vinculos_criados
+    }
+    
+    return {"mensagem": "Automação concluída!", "resumo": resumo}
 
 # ============================================================================
 # ROTAS DA API - MATRIZ CURRICULAR (VÍNCULOS)
