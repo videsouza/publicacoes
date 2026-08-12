@@ -588,7 +588,7 @@
                 </div>
 
                 <button class="btn-wizard voltar" onclick="mudarPasso(3, 2)">🡠 Voltar</button>
-                <button class="btn-wizard" style="background-color: #10b981;" onclick="mudarPasso(3, 4)">⚙️ Gerar Grade Mestra</button>
+                <button class="btn-wizard" style="background-color: #10b981;" onclick="dispararMotorIA()">⚙️ Gerar Grade Mestra</button>
                 <div style="clear: both;"></div>
             </div>
 
@@ -965,6 +965,40 @@
             if (!confirm("Remover este vínculo da matriz?")) return;
             await fetch(`/api/matrizes/${id}`, { method: 'DELETE' });
             carregarListaMatriz();
+        }
+
+        // ============================================================================
+        // MOTOR DE IA (OR-TOOLS)
+        // ============================================================================
+        async function dispararMotorIA() {
+            const btn = document.querySelector("#passo-3 .btn-wizard[style*='10b981']");
+            const textoOriginal = btn.innerHTML;
+            
+            btn.innerHTML = "⚙️ Processando IA...";
+            btn.disabled = true;
+
+            try {
+                const resposta = await fetch('/api/gerar-grade', { method: 'POST' });
+                const resultado = await resposta.json();
+
+                if (resultado.erro) {
+                    alert(resultado.erro);
+                    btn.innerHTML = textoOriginal;
+                    btn.disabled = false;
+                    return;
+                }
+
+                console.log(resultado.mensagem, "Vínculos processados:", resultado.dados_lidos);
+                
+                // Avança visualmente para o Passo 4 (Resultado)
+                mudarPasso(3, 4);
+
+            } catch (erro) {
+                alert("Falha ao comunicar com o motor de geração.");
+            } finally {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
         }
         
     </script>
