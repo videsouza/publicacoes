@@ -606,9 +606,14 @@
             <div id="passo-4" class="passo-conteudo">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="color: var(--azul-primario); margin: 0;">Grade Gerada com Sucesso!</h3>
-                    <button id="btn-exportar" class="btn-wizard" style="background-color: var(--azul-primario); width: auto; padding: 10px 20px;" onclick="baixarExcel()">
-                        📊 Exportar para Excel
-                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="btn-auditoria" class="btn-wizard" style="background-color: #f59e0b; width: auto; padding: 10px 20px;" onclick="abrirAuditoria()">
+                            🔍 Ver Auditoria
+                        </button>
+                        <button id="btn-exportar" class="btn-wizard" style="background-color: var(--azul-primario); width: auto; padding: 10px 20px;" onclick="baixarExcel()">
+                            📊 Exportar para Excel
+                        </button>
+                    </div>
                 </div>
                 
                 <p>Abaixo está a matriz otimizada para todas as turmas.</p>
@@ -1196,7 +1201,113 @@
                 btn.disabled = false;
             }
         }
+
+        // ============================================================================
+        // SISTEMA DE AUDITORIA DE GRADE
+        // ============================================================================
+        function abrirAuditoria() {
+            const grade = window.gradeAtual;
+            if (!grade || grade.length === 0) {
+                alert("Nenhuma grade encontrada para auditar.");
+                return;
+            }
+
+            // Pega as prioridades que o usuário marcou no Passo 3
+            const prioridadesMarcadas = Array.from(document.querySelectorAll('#lista-prioridades input:checked')).map(cb => cb.value.toUpperCase());
+
+            let profColisao = 0;
+            let turmaColisao = 0;
+            let profFadiga = 0;
+            let dobradinhasPerfeitas = 0;
+
+            const mapaProf = {};
+            const mapaTurma = {};
+            const mapaFadiga = {};
+            const mapaDobradinhas = {};
+
+            // Varredura completa da matriz
+            grade.forEach(aula => {
+                // 1. Checa Colisão de Professor (Mesmo dia e período)
+                const profKey = `${aula.dia}-${aula.periodo}-${aula.professor}`;
+                mapaProf[profKey] = (mapaProf[profKey] || 0) + 1;
+                if (mapaProf[profKey] > 1) profColisao++;
+
+                // 2. Checa Colisão de Turma (Mais de uma aula na mesma sala ao mesmo tempo)
+                const turmaKey = `${aula.dia}-${aula.periodo}-${aula.turma}`;
+                mapaTurma[turmaKey] = (mapaTurma[turmaKey] || 0) + 1;
+                if (mapaTurma[turmaKey] > 1) turmaColisao++;
+
+                // 3. Checa Fadiga (Quantas vezes no dia o professor visita a mesma turma)
+                const fadigaKey = `${aula.dia}-${aula.turma}-${aula.professor}`;
+                mapaFadiga[fadigaKey] = (mapaFadiga[fadigaKey] || 0) + 1;
+                
+                // 4. Mapeia Dobradinhas das prioridades
+                if (prioridadesMarcadas.includes(aula.disciplina.toUpperCase())) {
+                    const dobraKey = `${aula.dia}-${aula.turma}-${aula.disciplina}`;
+                    if(!mapaDobradinhas[dobraKey]) mapaDobradinhas[dobraKey] = [];
+                    mapaDobradinhas[dobraKey].push(aula.periodo);
+                }
+            });
+
+            // Avalia o limite de Fadiga (Max 2 aulas por turma)
+            Object.values(mapaFadiga).forEach(qtd => {
+                if (qtd > 2) profFadiga++;
+            });
+
+            // Avalia a qualidade das Dobradinhas
+            Object.values(mapaDobradinhas).forEach(periodos => {
+                if (periodos.length === 2) {
+                    // Se a diferença de período for 1, são seguidas. 
+                    // Se formam dobradinha entre a 3ª e a 4ª aula (índices 2 e 3), a diferença também é 1!
+                    if (Math.abs(periodos[0] - periodos[1]) === 1) {
+                        dobradinhasPerfeitas++;
+                    }
+                }
+            });
+
+            const aprovado = (profColisao === 0 && turmaColisao === 0 && profFadiga === 0);
+
+            // Monta o visual do relatório
+            const html = `
+                <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 1.05em;">
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Colisões de Professor</strong> (Locais simultâneos)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${profColisao === 0 ? '#10b981' : '#ef4444'};"><strong>${profColisao === 0 ? '✓ 0' : '✖ ' + profColisao}</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Colisões de Turma</strong> (Aulas sobrepostas)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${turmaColisao === 0 ? '#10b981' : '#ef4444'};"><strong>${turmaColisao === 0 ? '✓ 0' : '✖ ' + turmaColisao}</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Controle de Fadiga</strong> (Máx. 2 aulas/turma)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${profFadiga === 0 ? '#10b981' : '#ef4444'};"><strong>${profFadiga === 0 ? '✓ Respeitado' : '✖ ' + profFadiga + ' Violoções'}</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Blocos Duplos Otimizados</strong> (Prioridades)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: var(--azul-primario);"><strong>${dobradinhasPerfeitas} blocos</strong></td>
+                    </tr>
+                </table>
+                
+                <div style="background: ${aprovado ? '#dcfce7' : '#fee2e2'}; padding: 15px; border-radius: 6px; margin-top: 25px; text-align: center; border: 1px solid ${aprovado ? '#86efac' : '#fca5a5'};">
+                    <h4 style="margin: 0; color: ${aprovado ? '#166534' : '#991b1b'};">
+                        ${aprovado ? 'Aprovação Total! A matriz cumpre 100% das restrições.' : 'Atenção! A matriz possui conflitos e precisa ser revisada.'}
+                    </h4>
+                </div>
+            `;
+
+            document.getElementById('conteudo-auditoria').innerHTML = html;
+            document.getElementById('modal-auditoria').style.display = 'flex';
+        }
         
     </script>
+
+    <!-- MODAL DE AUDITORIA -->
+    <div id="modal-auditoria" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 30px; border-radius: 8px; width: 90%; max-width: 600px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <h2 style="color: var(--azul-primario); margin-top: 0; border-bottom: 2px solid var(--azul-claro); padding-bottom: 10px;">Relatório de Auditoria</h2>
+            <div id="conteudo-auditoria"></div>
+            <button class="btn-wizard" style="margin-top: 25px; width: 100%; background-color: var(--texto-escuro);" onclick="document.getElementById('modal-auditoria').style.display='none'">Fechar Relatório</button>
+        </div>
+    </div>
 </body>
 </html>
