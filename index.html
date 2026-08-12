@@ -604,36 +604,19 @@
 
             <!-- PASSO 4: Grade Gerada (Resultado) -->
             <div id="passo-4" class="passo-conteudo">
-                <h3 style="color: var(--azul-primario);">Matriz Curricular Concluída</h3>
-                <p>Visualização final da grade gerada pelo sistema.</p>
-                
-                <div class="tabela-container">
-                    <table class="tabela-grade">
-                        <thead>
-                            <tr>
-                                <th>Horário</th>
-                                <th>Segunda</th>
-                                <th>Terça</th>
-                                <th>Quarta</th>
-                                <th>Quinta</th>
-                                <th>Sexta</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>1º Período</strong></td>
-                                <td>Matemática</td>
-                                <td>Português</td>
-                                <td>História</td>
-                                <td>Geografia</td>
-                                <td>Física</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="color: var(--azul-primario); margin: 0;">Grade Gerada com Sucesso!</h3>
+                    <button id="btn-exportar" class="btn-wizard" style="background-color: var(--azul-primario); width: auto; padding: 10px 20px;" onclick="baixarExcel()">
+                        📊 Exportar para Excel
+                    </button>
                 </div>
-
-                <button class="btn-wizard voltar" onclick="mudarPasso(4, 3)">🡠 Refazer Geração</button>
-                <button class="btn-wizard">💾 Salvar e Finalizar</button>
+                
+                <p>Abaixo está a matriz otimizada para todas as turmas.</p>
+                <div class="tabela-container">
+                    <!-- As tabelas desenhadas via JS aparecerão aqui -->
+                </div>
+                
+                <button class="btn-wizard voltar" style="margin-top: 20px;" onclick="mudarPasso(4, 3)">🡠 Refazer Configurações</button>
                 <div style="clear: both;"></div>
             </div>
         </div>
@@ -1026,6 +1009,9 @@
                     return;
                 }
 
+                // Salva a grade na memória do navegador para podermos exportar depois
+                window.gradeAtual = resultado.grade; 
+                
                 desenharGrade(resultado.grade);
                 mudarPasso(3, 4);
 
@@ -1162,6 +1148,51 @@
                 alert("Falha de comunicação na importação do arquivo.");
             } finally {
                 btn.innerText = "Carregar Dados";
+                btn.disabled = false;
+            }
+        }
+
+
+        // ============================================================================
+        // EXPORTAÇÃO PARA EXCEL
+        // ============================================================================
+        async function baixarExcel() {
+            if (!window.gradeAtual || window.gradeAtual.length === 0) {
+                alert("Não há nenhuma grade gerada para exportar.");
+                return;
+            }
+
+            const btn = document.getElementById("btn-exportar");
+            const textoOriginal = btn.innerHTML;
+            btn.innerHTML = "⏳ Processando...";
+            btn.disabled = true;
+
+            try {
+                const resposta = await fetch('/api/exportar-grade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(window.gradeAtual)
+                });
+
+                if (!resposta.ok) throw new Error("Falha ao gerar o arquivo");
+
+                // Transforma a resposta do servidor em um arquivo "baixável"
+                const blob = await resposta.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "Grade_Escolar_Oficial.xlsx";
+                document.body.appendChild(a);
+                a.click();
+                
+                // Limpa o link temporário
+                a.remove();
+                window.URL.revokeObjectURL(url);
+
+            } catch (erro) {
+                alert("Houve um erro ao tentar baixar a planilha.");
+            } finally {
+                btn.innerHTML = textoOriginal;
                 btn.disabled = false;
             }
         }
