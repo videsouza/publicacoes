@@ -988,7 +988,9 @@
                     return;
                 }
 
-                console.log(resultado.mensagem, "Vínculos processados:", resultado.dados_lidos);
+                // -> A MÁGICA ACONTECE AQUI <-
+                // Envia os dados resolvidos pela Inteligência para a nossa função visual
+                desenharGrade(resultado.grade);
                 
                 // Avança visualmente para o Passo 4 (Resultado)
                 mudarPasso(3, 4);
@@ -999,6 +1001,86 @@
                 btn.innerHTML = textoOriginal;
                 btn.disabled = false;
             }
+        }
+
+        // ============================================================================
+        // RENDERIZAÇÃO DA GRADE FINAL
+        // ============================================================================
+        function desenharGrade(gradeData) {
+            // Seleciona a div que vai receber as tabelas e limpa o conteúdo estático de exemplo
+            const container = document.querySelector('#passo-4 .tabela-container');
+            container.innerHTML = ''; 
+
+            // Descobre quais turmas únicas foram geradas no resultado
+            const turmas = [...new Set(gradeData.map(item => item.turma))].sort();
+
+            turmas.forEach(turma => {
+                // Cria um cabeçalho identificando a turma
+                const titulo = document.createElement('h3');
+                titulo.style.color = 'var(--azul-primario)';
+                titulo.style.marginTop = '30px';
+                titulo.style.borderBottom = '2px solid var(--azul-claro)';
+                titulo.style.paddingBottom = '8px';
+                titulo.innerText = `Matriz da Turma: ${turma}`;
+                container.appendChild(titulo);
+
+                // Cria a estrutura da tabela
+                const tabela = document.createElement('table');
+                tabela.className = 'tabela-grade';
+                tabela.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Horário</th>
+                            <th>Segunda</th>
+                            <th>Terça</th>
+                            <th>Quarta</th>
+                            <th>Quinta</th>
+                            <th>Sexta</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+
+                const tbody = tabela.querySelector('tbody');
+
+                // Percorre os 5 períodos de aula diários
+                for (let p = 0; p < 5; p++) {
+                    // Adiciona a linha do intervalo após o 3º período
+                    if (p === 3) {
+                        const trIntervalo = document.createElement('tr');
+                        trIntervalo.style.backgroundColor = 'var(--azul-claro)';
+                        trIntervalo.innerHTML = `
+                            <td><strong>Intervalo</strong></td>
+                            <td colspan="5" style="color: var(--azul-primario); font-weight: bold; letter-spacing: 5px;">R E C R E I O</td>
+                        `;
+                        tbody.appendChild(trIntervalo);
+                    }
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td><strong>${p + 1}º Período</strong></td>`;
+
+                    // Preenche os dias da semana (0=Seg, 1=Ter, 2=Qua, 3=Qui, 4=Sex)
+                    for (let d = 0; d < 5; d++) {
+                        // Busca se existe uma aula agendada para esta turma, neste dia e neste período
+                        const aula = gradeData.find(item => item.turma === turma && item.dia === d && item.periodo === p);
+
+                        if (aula) {
+                            tr.innerHTML += `
+                                <td style="background-color: white;">
+                                    <strong style="color: var(--texto-escuro); font-size: 1.05em;">${aula.disciplina}</strong><br>
+                                    <span style="font-size: 0.85em; color: var(--texto-cinza);">${aula.professor}</span>
+                                </td>
+                            `;
+                        } else {
+                            // Caso o OR-Tools deixe um buraco na grade (falta de aulas cadastradas)
+                            tr.innerHTML += `<td style="color: #cbd5e1; font-style: italic;">Vago</td>`;
+                        }
+                    }
+                    tbody.appendChild(tr);
+                }
+
+                container.appendChild(tabela);
+            });
         }
         
     </script>
