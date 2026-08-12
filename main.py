@@ -366,7 +366,8 @@ def gerar_grade_mestra(config: ConfigGrade):
         
     padroes_dois = [] 
     for p in range(5):
-        if p == 2: continue # Pula o recreio
+        # A trava do recreio (if p == 2: continue) foi removida!
+        # Agora a IA tem permissão total para criar uma dobradinha unindo a 3ª e a 4ª aula.
         padrao = [0] * 6
         padrao[p] = 1
         padrao[p+1] = 1
