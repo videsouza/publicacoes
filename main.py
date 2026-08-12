@@ -5,6 +5,7 @@ from ortools.sat.python import cp_model
 from fastapi import UploadFile, File
 import pandas as pd
 import io
+from typing import List
 
 app = FastAPI(title="Sistema Base 2.0")
 
@@ -93,6 +94,9 @@ class MatrizBase(BaseModel):
     disciplina_id: int
     professor_id: int
     aulas: int
+
+class ConfigGrade(BaseModel):
+    prioridades: List[str] = []
 
 # ============================================================================
 # ROTAS DA API - TURMAS
@@ -350,7 +354,7 @@ def deletar_matriz(matriz_id: int):
 # ROTAS DA API - MOTOR DE GERAÇÃO DE GRADE (OR-TOOLS)
 # ============================================================================
 @app.post("/api/gerar-grade")
-def gerar_grade_mestra():
+def gerar_grade_mestra(config: ConfigGrade):
     conexao = sqlite3.connect("banco_sistema.db")
     cursor = conexao.cursor()
     
@@ -471,6 +475,34 @@ def gerar_grade_mestra():
         for m in matriz:
             aulas_no_dia = [grade[(m[0], d, p)] for p in range(6)]
             modelo.AddAllowedAssignments(aulas_no_dia, padroes_permitidos)
+
+    # ------------------------------------------------------------------------
+    # PASSO E: OTIMIZADOR (SISTEMA DE RECOMPENSAS)
+    # ------------------------------------------------------------------------
+    variaveis_recompensa = []
+    lista_prioridades = [p.strip().upper() for p in config.prioridades]
+    
+    for d in dias:
+        for m in matriz:
+            m_id = m[0]
+            nome_disciplina = str(m[2]).strip().upper()
+            
+            aulas_no_dia = [grade[(m_id, d, p)] for p in periodos]
+            
+            # Cria uma chave de "Sim/Não" para identificar se a dobradinha ocorreu
+            tem_dobradinha = modelo.NewBoolVar(f'dobra_{m_id}_d{d}')
+            
+            # Conecta a chave booleana à soma real de aulas do dia
+            modelo.Add(sum(aulas_no_dia) == 2).OnlyEnforceIf(tem_dobradinha)
+            modelo.Add(sum(aulas_no_dia) < 2).OnlyEnforceIf(tem_dobradinha.Not())
+            
+            # Se a disciplina foi marcada no painel, ganha peso 10. Se não, ganha 1.
+            peso = 10 if nome_disciplina in lista_prioridades else 1
+            
+            variaveis_recompensa.append(tem_dobradinha * peso)
+            
+    # Comando Mestre: Pede à IA que encontre o cenário com a MAIOR pontuação possível
+    modelo.Maximize(sum(variaveis_recompensa))
 
     # ------------------------------------------------------------------------
     # PASSO D: RESOLVER O QUEBRA-CABEÇA
