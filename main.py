@@ -243,7 +243,7 @@ def gerar_grade_mestra():
     conexao = sqlite3.connect("banco_sistema.db")
     cursor = conexao.cursor()
     
-    # 1. Busca as regras do jogo (Matriz Curricular)
+    # 1. Busca os vínculos cadastrados
     cursor.execute('''
         SELECT m.id, t.nome, d.nome, p.nome, m.aulas 
         FROM matrizes m
@@ -257,18 +257,80 @@ def gerar_grade_mestra():
     if not matriz:
         return {"erro": "A matriz curricular está vazia. Adicione vínculos no Passo 2."}
 
-    # 2. Inicializa o Cérebro do OR-Tools
+    # Inicializa o Cérebro do OR-Tools
     modelo = cp_model.CpModel()
     
+    # Dimensões padrão: 5 dias da semana (Seg-Sex), 5 períodos por dia
+    dias = range(5)
+    periodos = range(5)
+    
     # ------------------------------------------------------------------------
-    # O espaço onde a mágica matemática vai acontecer nas próximas etapas:
-    # - Criação das Variáveis (Dias, Horários, Professores)
-    # - Restrições Rígidas (Ex: Professor não pode dar duas aulas ao mesmo tempo)
-    # - Restrições Flexíveis (Ex: Evitar janelas e fadiga)
+    # PASSO A: CRIANDO AS VARIÁVEIS (A Grade em Branco)
     # ------------------------------------------------------------------------
+    grade = {}
+    for m in matriz:
+        m_id = m[0]
+        for d in dias:
+            for p in periodos:
+                # Cria um interruptor (0 ou 1) para cada possibilidade de horário
+                grade[(m_id, d, p)] = modelo.NewBoolVar(f'aula_{m_id}_d{d}_p{p}')
 
-    # 3. Retorno temporário para testarmos a conexão da tela com o Python
-    return {
-        "mensagem": "Motor OR-Tools acionado com sucesso!",
-        "dados_lidos": len(matriz)
-    }
+    # ------------------------------------------------------------------------
+    # PASSO B: REGRA DE CAPACIDADE (Cumprir a Matriz)
+    # ------------------------------------------------------------------------
+    for m in matriz:
+        m_id = m[0]
+        qtd_aulas = m[4]
+        # A soma de todas as aulas daquele vínculo na semana deve ser exatamente a cadastrada
+        modelo.Add(sum(grade[(m_id, d, p)] for d in dias for p in periodos) == qtd_aulas)
+
+    # ------------------------------------------------------------------------
+    # PASSO C: REGRAS DE COLISÃO (Ocupação de Espaço Físico)
+    # ------------------------------------------------------------------------
+    
+    # C1. Uma TURMA só pode ter no máximo 1 aula por horário
+    turmas_unicas = set(m[1] for m in matriz)
+    for d in dias:
+        for p in periodos:
+            for turma in turmas_unicas:
+                aulas_da_turma = [grade[(m[0], d, p)] for m in matriz if m[1] == turma]
+                modelo.AddAtMostOne(aulas_da_turma)
+                
+    # C2. Um PROFESSOR só pode dar no máximo 1 aula por horário
+    professores_unicos = set(m[3] for m in matriz)
+    for d in dias:
+        for p in periodos:
+            for prof in professores_unicos:
+                aulas_do_prof = [grade[(m[0], d, p)] for m in matriz if m[3] == prof]
+                modelo.AddAtMostOne(aulas_do_prof)
+
+    # ------------------------------------------------------------------------
+    # PASSO D: RESOLVER O QUEBRA-CABEÇA
+    # ------------------------------------------------------------------------
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = 10.0 # Dá 10 segundos para a IA pensar
+    
+    status = solver.Solve(modelo)
+
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        # Se encontrou solução, empacotamos o resultado para enviar à tela
+        resultado_grade = []
+        for m in matriz:
+            for d in dias:
+                for p in periodos:
+                    if solver.Value(grade[(m[0], d, p)]) == 1:
+                        resultado_grade.append({
+                            "turma": m[1],
+                            "disciplina": m[2],
+                            "professor": m[3],
+                            "dia": d,
+                            "periodo": p
+                        })
+        
+        return {
+            "mensagem": "Grade gerada com sucesso!",
+            "status": "sucesso",
+            "grade": resultado_grade
+        }
+    else:
+        return {"erro": "Impossível gerar a grade. Verifique se há aulas demais cadastradas para o limite de horários."}
