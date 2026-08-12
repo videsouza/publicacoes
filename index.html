@@ -1123,14 +1123,18 @@
                 const resultado = await resposta.json();
                 
                 if (resposta.ok) {
-                    alert(`${resultado.mensagem}\n\nRegistros adicionados:\n🎓 Turmas: ${resultado.resumo.turmas}\n📚 Disciplinas: ${resultado.resumo.disciplinas}\n👨‍🏫 Professores: ${resultado.resumo.professores}`);
-                    
-                    // Recarrega as três listas visuais
-                    carregarTurmas();
-                    carregarDisciplinas();
-                    carregarProfessores();
-                    
-                    fileInput.value = ''; // Limpa o campo do arquivo
+                    if (resultado.erro) {
+                        alert(resultado.erro);
+                    } else {
+                        alert(`${resultado.mensagem}\n\nRegistros adicionados:\n🎓 Turmas: ${resultado.resumo.turmas}\n📚 Disciplinas: ${resultado.resumo.disciplinas}\n👨‍🏫 Professores: ${resultado.resumo.professores}\n🔗 Vínculos de Matriz: ${resultado.resumo.vinculos}`);
+                        
+                        // Recarrega as três listas visuais
+                        carregarTurmas();
+                        carregarDisciplinas();
+                        carregarProfessores();
+                        
+                        fileInput.value = ''; // Limpa o campo do arquivo
+                    }
                 } else {
                     alert("Erro ao processar a planilha.");
                 }
