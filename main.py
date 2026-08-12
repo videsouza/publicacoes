@@ -2,7 +2,7 @@ import sqlite3
 import io
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List
 from ortools.sat.python import cp_model
@@ -59,6 +59,13 @@ class MatrizBase(BaseModel):
 
 class ConfigGrade(BaseModel):
     prioridades: List[str] = []
+
+class ItemGrade(BaseModel):
+    turma: str
+    disciplina: str
+    professor: str
+    dia: int
+    periodo: int
 
 # ============================================================================
 # ROTAS DA API - TURMAS
@@ -440,3 +447,51 @@ def gerar_grade_mestra(config: ConfigGrade):
         }
     else:
         return {"erro": "A Inteligência não conseguiu resolver a grade. Tente reduzir as restrições ou verifique se as aulas cadastradas ultrapassam 30 semanais por turma."}
+
+
+# ============================================================================
+# ROTA DE EXPORTAÇÃO PARA EXCEL
+# ============================================================================
+@app.post("/api/exportar-grade")
+def exportar_grade_excel(grade: List[ItemGrade]):
+    # Converte os dados recebidos em um DataFrame do Pandas
+    df = pd.DataFrame([item.dict() for item in grade])
+    
+    # Traduz os dias da semana
+    mapa_dias = {0: "Segunda", 1: "Terça", 2: "Quarta", 3: "Quinta", 4: "Sexta"}
+    df['dia'] = df['dia'].map(mapa_dias)
+    
+    # Ajusta o período para formato legível (Soma 1 porque o Python começa no 0)
+    df['periodo'] = (df['periodo'] + 1).astype(str) + "º Período"
+    
+    # Renomeia as colunas para o Excel
+    df = df.rename(columns={
+        "turma": "Turma",
+        "disciplina": "Disciplina",
+        "professor": "Professor",
+        "dia": "Dia da Semana",
+        "periodo": "Horário"
+    })
+    
+    # Ordena a planilha para facilitar a leitura
+    ordem_dias = {"Segunda": 1, "Terça": 2, "Quarta": 3, "Quinta": 4, "Sexta": 5}
+    df['ordem_dia'] = df['Dia da Semana'].map(ordem_dias)
+    df = df.sort_values(by=["Turma", "ordem_dia", "Horário"])
+    df = df.drop(columns=['ordem_dia'])
+    
+    # Cria o arquivo Excel na memória RAM (sem salvar no HD do servidor)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Grade_Pronta')
+    
+    output.seek(0)
+    
+    # Devolve o arquivo como um download forçado para o navegador
+    headers = {
+        'Content-Disposition': 'attachment; filename="Grade_Escolar_Oficial.xlsx"'
+    }
+    return StreamingResponse(
+        output, 
+        headers=headers, 
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
