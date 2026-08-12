@@ -201,7 +201,7 @@ def deletar_professor(professor_id: int):
     return {"mensagem": "Professor removido!"}
 
 # ============================================================================
-# ROTA DE IMPORTAÇÃO EM LOTE (EXCEL)
+# ROTA DE IMPORTAÇÃO EM LOTE (EXCEL) - MODO SUBSTITUIÇÃO TOTAL
 # ============================================================================
 @app.post("/api/upload-cadastros")
 async def upload_cadastros(file: UploadFile = File(...)):
@@ -209,30 +209,36 @@ async def upload_cadastros(file: UploadFile = File(...)):
     
     # Lê a planilha usando o Pandas
     df = pd.read_excel(io.BytesIO(conteudo))
-    
-    # Padroniza os nomes das colunas para evitar erros de digitação (espaços extras)
     df.columns = df.columns.str.strip().str.upper()
     
     conexao = sqlite3.connect("banco_sistema.db")
     cursor = conexao.cursor()
     
+    # 1. LIMPEZA TOTAL ANTES DA IMPORTAÇÃO
+    # Apaga todos os registros antigos para iniciar um cadastro limpo
+    cursor.execute("DELETE FROM turmas")
+    cursor.execute("DELETE FROM disciplinas")
+    cursor.execute("DELETE FROM professores")
+    # Também apagamos a matriz para evitar que ela fique procurando IDs que não existem mais
+    cursor.execute("DELETE FROM matrizes") 
+    
     resumo = {"turmas": 0, "disciplinas": 0, "professores": 0}
     
-    # 1. Processa a coluna TURMAS
+    # 2. Processa a coluna TURMAS
     if 'TURMAS' in df.columns:
         turmas = df['TURMAS'].dropna().unique()
         for t in turmas:
             cursor.execute("INSERT INTO turmas (nome) VALUES (?)", (str(t).strip(),))
             resumo["turmas"] += 1
             
-    # 2. Processa a coluna DISCIPLINAS
+    # 3. Processa a coluna DISCIPLINAS
     if 'DISCIPLINAS' in df.columns:
         disciplinas = df['DISCIPLINAS'].dropna().unique()
         for d in disciplinas:
             cursor.execute("INSERT INTO disciplinas (nome) VALUES (?)", (str(d).strip(),))
             resumo["disciplinas"] += 1
             
-    # 3. Processa a coluna PROFESSORES
+    # 4. Processa a coluna PROFESSORES
     if 'PROFESSORES' in df.columns:
         professores = df['PROFESSORES'].dropna().unique()
         for p in professores:
@@ -242,7 +248,7 @@ async def upload_cadastros(file: UploadFile = File(...)):
     conexao.commit()
     conexao.close()
     
-    return {"mensagem": "Importação concluída com sucesso!", "resumo": resumo}
+    return {"mensagem": "Registros antigos apagados e importação concluída!", "resumo": resumo}
 
 # ============================================================================
 # ROTAS DA API - MATRIZ CURRICULAR (VÍNCULOS)
