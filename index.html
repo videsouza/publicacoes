@@ -1016,7 +1016,7 @@
 
                 // Salva a grade na memória do navegador para podermos exportar depois
                 window.gradeAtual = resultado.grade; 
-                
+                window.restricoesAtual = resultado.restricoes;
                 desenharGrade(resultado.grade);
                 mudarPasso(3, 4);
 
@@ -1203,16 +1203,16 @@
         }
 
         // ============================================================================
-        // SISTEMA DE AUDITORIA DE GRADE
+        // SISTEMA DE AUDITORIA DE GRADE AVANÇADO
         // ============================================================================
         function abrirAuditoria() {
             const grade = window.gradeAtual;
+            const restricoes = window.restricoesAtual || [];
             if (!grade || grade.length === 0) {
                 alert("Nenhuma grade encontrada para auditar.");
                 return;
             }
 
-            // Pega as prioridades que o usuário marcou no Passo 3
             const prioridadesMarcadas = Array.from(document.querySelectorAll('#lista-prioridades input:checked')).map(cb => cb.value.toUpperCase());
 
             let profColisao = 0;
@@ -1220,28 +1220,27 @@
             let profFadiga = 0;
             let dobradinhasPerfeitas = 0;
 
+            let totalX = 0, violacoesX = 0;
+            let totalY = 0, satisfeitasY = 0;
+
             const mapaProf = {};
             const mapaTurma = {};
             const mapaFadiga = {};
             const mapaDobradinhas = {};
 
-            // Varredura completa da matriz
+            // 1. Varredura da Grade Geral (Colisões e Fadiga)
             grade.forEach(aula => {
-                // 1. Checa Colisão de Professor (Mesmo dia e período)
                 const profKey = `${aula.dia}-${aula.periodo}-${aula.professor}`;
                 mapaProf[profKey] = (mapaProf[profKey] || 0) + 1;
                 if (mapaProf[profKey] > 1) profColisao++;
 
-                // 2. Checa Colisão de Turma (Mais de uma aula na mesma sala ao mesmo tempo)
                 const turmaKey = `${aula.dia}-${aula.periodo}-${aula.turma}`;
                 mapaTurma[turmaKey] = (mapaTurma[turmaKey] || 0) + 1;
                 if (mapaTurma[turmaKey] > 1) turmaColisao++;
 
-                // 3. Checa Fadiga (Quantas vezes no dia o professor visita a mesma turma)
                 const fadigaKey = `${aula.dia}-${aula.turma}-${aula.professor}`;
                 mapaFadiga[fadigaKey] = (mapaFadiga[fadigaKey] || 0) + 1;
                 
-                // 4. Mapeia Dobradinhas das prioridades
                 if (prioridadesMarcadas.includes(aula.disciplina.toUpperCase())) {
                     const dobraKey = `${aula.dia}-${aula.turma}-${aula.disciplina}`;
                     if(!mapaDobradinhas[dobraKey]) mapaDobradinhas[dobraKey] = [];
@@ -1249,25 +1248,27 @@
                 }
             });
 
-            // Avalia o limite de Fadiga (Max 2 aulas por turma)
-            Object.values(mapaFadiga).forEach(qtd => {
-                if (qtd > 2) profFadiga++;
-            });
-
-            // Avalia a qualidade das Dobradinhas
-            Object.values(mapaDobradinhas).forEach(periodos => {
-                if (periodos.length === 2) {
-                    // Se a diferença de período for 1, são seguidas. 
-                    // Se formam dobradinha entre a 3ª e a 4ª aula (índices 2 e 3), a diferença também é 1!
-                    if (Math.abs(periodos[0] - periodos[1]) === 1) {
-                        dobradinhasPerfeitas++;
-                    }
+            // 2. Varredura da Planilha 3 (Restrições X e Y)
+            restricoes.forEach(res => {
+                // Tenta achar se a IA colocou uma aula exatamente neste dia/horário para este professor
+                const temAula = grade.some(aula => aula.professor === res.professor && aula.dia === res.dia && aula.periodo === res.periodo);
+                
+                if (res.tipo === 'X') {
+                    totalX++;
+                    if (temAula) violacoesX++; // Se tem aula no 'X', é uma violação grave
+                } else if (res.tipo === 'Y') {
+                    totalY++;
+                    if (temAula) satisfeitasY++; // Se tem aula no 'Y', a IA atendeu ao pedido
                 }
             });
 
-            const aprovado = (profColisao === 0 && turmaColisao === 0 && profFadiga === 0);
+            Object.values(mapaFadiga).forEach(qtd => { if (qtd > 2) profFadiga++; });
+            Object.values(mapaDobradinhas).forEach(periodos => {
+                if (periodos.length === 2 && Math.abs(periodos[0] - periodos[1]) === 1) dobradinhasPerfeitas++;
+            });
 
-            // Monta o visual do relatório
+            const aprovado = (profColisao === 0 && turmaColisao === 0 && profFadiga === 0 && violacoesX === 0);
+
             const html = `
                 <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 1.05em;">
                     <tr>
@@ -1275,16 +1276,24 @@
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${profColisao === 0 ? '#10b981' : '#ef4444'};"><strong>${profColisao === 0 ? '✓ 0' : '✖ ' + profColisao}</strong></td>
                     </tr>
                     <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Colisões de Turma</strong> (Aulas sobrepostas)</td>
-                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${turmaColisao === 0 ? '#10b981' : '#ef4444'};"><strong>${turmaColisao === 0 ? '✓ 0' : '✖ ' + turmaColisao}</strong></td>
-                    </tr>
-                    <tr>
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Controle de Fadiga</strong> (Máx. 2 aulas/turma)</td>
-                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${profFadiga === 0 ? '#10b981' : '#ef4444'};"><strong>${profFadiga === 0 ? '✓ Respeitado' : '✖ ' + profFadiga + ' Violoções'}</strong></td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${profFadiga === 0 ? '#10b981' : '#ef4444'};"><strong>${profFadiga === 0 ? '✓ Respeitado' : '✖ ' + profFadiga}</strong></td>
                     </tr>
                     <tr>
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Blocos Duplos Otimizados</strong> (Prioridades)</td>
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: var(--azul-primario);"><strong>${dobradinhasPerfeitas} blocos</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Bloqueios Físicos (X)</strong> (Planilha 3)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${violacoesX === 0 ? '#10b981' : '#ef4444'};">
+                            <strong>${totalX > 0 ? (violacoesX === 0 ? '✓ 100% Respeitados' : '✖ ' + violacoesX + ' Violações') : 'Sem registros'}</strong>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Preferências Atendidas (Y)</strong> (Planilha 3)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: var(--azul-primario);">
+                            <strong>${totalY > 0 ? satisfeitasY + ' de ' + totalY + ' (' + Math.round((satisfeitasY/totalY)*100) + '%)' : 'Sem registros'}</strong>
+                        </td>
                     </tr>
                 </table>
                 
