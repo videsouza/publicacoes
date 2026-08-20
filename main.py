@@ -182,7 +182,7 @@ async def upload_cadastros(file: UploadFile = File(...)):
 
     conexao.commit()
     conexao.close()
-    return {"mensagem": "Automação concluída!", "resumo": {"turmas": len(turmas_set), "professores": len(professores_set), "vinculos": vinculos}}
+    return {"mensagem": "Automação concluída!", "resumo": {"turmas": len(turmas_set), "disciplinas": len(disciplinas_set), "professores": len(professores_set), "vinculos": vinculos}}
 
 # ============================================================================
 # MOTOR DE GERAÇÃO E DIAGNÓSTICO (OR-TOOLS)
