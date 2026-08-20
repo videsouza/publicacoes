@@ -317,7 +317,16 @@ def gerar_grade_mestra(config: ConfigGrade):
                 for p in periodos:
                     if solver.Value(grade[(m[0], d, p)]) == 1:
                         resultado_grade.append({"turma": m[1], "disciplina": m[2], "professor": m[3], "dia": d, "periodo": p})
-        return {"mensagem": "Grade gerada!", "status": "sucesso", "grade": resultado_grade}
+        
+        # Empacota as restrições da Planilha 3 para o relatório visual
+        lista_restricoes = [{"professor": r[0], "dia": r[1], "periodo": r[2], "tipo": r[3]} for r in restricoes_brutas]
+        
+        return {
+            "mensagem": "Grade gerada!", 
+            "status": "sucesso", 
+            "grade": resultado_grade,
+            "restricoes": lista_restricoes
+        }
     
     else:
         # Se os dados passaram pela pré-checagem matemática mas o algoritmo falhou:
