@@ -460,6 +460,11 @@ def exportar_grade_excel(grade: List[ItemGrade]):
 
 @app.post("/api/gerar-grade-oracle")
 def gerar_grade_oracle(dados: Dict[str, Any]):
+
+    # ========================================================================
+    # 1. RECEBIMENTO DOS DADOS DO ORACLE/APEX
+    # ========================================================================
+
     turmas = dados.get("turmas", [])
     disciplinas = dados.get("disciplinas", [])
     professores = dados.get("professores", [])
@@ -467,17 +472,483 @@ def gerar_grade_oracle(dados: Dict[str, Any]):
     horarios = dados.get("horarios", [])
     disponibilidades = dados.get("disponibilidades", [])
     salas = dados.get("salas", [])
+    prioridades = [
+        str(p).strip().upper()
+        for p in dados.get("prioridades", [])
+    ]
+
+    if not aulas:
+        return {
+            "status": "erro",
+            "mensagem": "Nenhuma aula foi enviada para geração da grade."
+        }
+
+    if not horarios:
+        return {
+            "status": "erro",
+            "mensagem": "Nenhum horário foi enviado para geração da grade."
+        }
+
+    # ========================================================================
+    # 2. ORGANIZAÇÃO DOS HORÁRIOS
+    #
+    # Cada horário Oracle passa a ser uma posição real do modelo.
+    # Não usamos mais range(5) x range(6).
+    # ========================================================================
+
+    slots = []
+
+    for h in horarios:
+        slots.append({
+            "id_horario": h["id"],
+            "dia": int(h["dia_semana"]),
+            "periodo": int(h["numero_aula"]),
+            "hora_inicio": h.get("hora_inicio"),
+            "hora_fim": h.get("hora_fim")
+        })
+
+    # Índice interno do OR-Tools
+    slot_por_id = {
+        slot["id_horario"]: i
+        for i, slot in enumerate(slots)
+    }
+
+    # ========================================================================
+    # 3. MAPAS AUXILIARES
+    # ========================================================================
+
+    turma_por_id = {
+        t["id"]: t["nome"]
+        for t in turmas
+    }
+
+    disciplina_por_id = {
+        d["id"]: d["nome"]
+        for d in disciplinas
+    }
+
+    professor_por_id = {
+        p["id"]: p["nome"]
+        for p in professores
+    }
+
+    # ========================================================================
+    # 4. VALIDAÇÃO DAS AULAS
+    # ========================================================================
+
+    aulas_validas = []
+
+    for aula in aulas:
+
+        id_aula = aula["id_aula"]
+
+        if aula["id_turma"] not in turma_por_id:
+            return {
+                "status": "erro",
+                "mensagem": f"A aula {id_aula} referencia uma turma inexistente."
+            }
+
+        if aula["id_disciplina"] not in disciplina_por_id:
+            return {
+                "status": "erro",
+                "mensagem": f"A aula {id_aula} referencia uma disciplina inexistente."
+            }
+
+        if aula["id_professor"] not in professor_por_id:
+            return {
+                "status": "erro",
+                "mensagem": f"A aula {id_aula} referencia um professor inexistente."
+            }
+
+        aulas_validas.append(aula)
+
+    # ========================================================================
+    # 5. PROFESSORES E TURMAS ENVOLVIDOS
+    # ========================================================================
+
+    professores_unicos = set(
+        aula["id_professor"]
+        for aula in aulas_validas
+    )
+
+    turmas_unicas = set(
+        aula["id_turma"]
+        for aula in aulas_validas
+    )
+
+    # ========================================================================
+    # 6. RESTRIÇÕES X E Y
+    #
+    # X = bloqueio absoluto
+    # Y = preferência
+    # ========================================================================
+
+    bloqueios_x = set()
+    preferencias_y = set()
+
+    for disp in disponibilidades:
+
+        id_professor = disp["id_professor"]
+        id_horario = disp["id_horario"]
+        tipo = str(disp["tipo"]).strip().upper()
+
+        if id_horario not in slot_por_id:
+            continue
+
+        chave = (id_professor, id_horario)
+
+        if tipo == "X":
+            bloqueios_x.add(chave)
+
+        elif tipo == "Y":
+            preferencias_y.add(chave)
+
+    # ========================================================================
+    # 7. PRÉ-CHECAGEM MATEMÁTICA
+    # ========================================================================
+
+    # Cada professor precisa ter horários suficientes para sua carga.
+    for id_professor in professores_unicos:
+
+        carga_total = sum(
+            int(aula["aulas_semana"])
+            for aula in aulas_validas
+            if aula["id_professor"] == id_professor
+        )
+
+        horarios_bloqueados = sum(
+            1
+            for slot in slots
+            if (id_professor, slot["id_horario"]) in bloqueios_x
+        )
+
+        horarios_disponiveis = len(slots) - horarios_bloqueados
+
+        if carga_total > horarios_disponiveis:
+
+            nome_professor = professor_por_id[id_professor]
+
+            return {
+                "status": "erro",
+                "mensagem": (
+                    f"ERRO DE MATRIZ: O(a) professor(a) "
+                    f"{nome_professor} possui {carga_total} aulas "
+                    f"alocadas, mas possui apenas "
+                    f"{horarios_disponiveis} horários disponíveis."
+                )
+            }
+
+    # Cada turma também precisa comportar sua carga.
+    for id_turma in turmas_unicas:
+
+        carga_turma = sum(
+            int(aula["aulas_semana"])
+            for aula in aulas_validas
+            if aula["id_turma"] == id_turma
+        )
+
+        if carga_turma > len(slots):
+
+            nome_turma = turma_por_id[id_turma]
+
+            return {
+                "status": "erro",
+                "mensagem": (
+                    f"ERRO DE MATRIZ: A turma {nome_turma} possui "
+                    f"{carga_turma} aulas, mas existem apenas "
+                    f"{len(slots)} horários disponíveis."
+                )
+            }
+
+    # ========================================================================
+    # 8. MODELO CP-SAT
+    # ========================================================================
+
+    modelo = cp_model.CpModel()
+
+    grade = {}
+
+    for aula in aulas_validas:
+
+        id_aula = aula["id_aula"]
+
+        for slot_index, slot in enumerate(slots):
+
+            grade[(id_aula, slot_index)] = modelo.NewBoolVar(
+                f"aula_{id_aula}_slot_{slot_index}"
+            )
+
+    # ========================================================================
+    # C1 — CADA AULA DEVE CUMPRIR SUA CARGA SEMANAL
+    # ========================================================================
+
+    for aula in aulas_validas:
+
+        id_aula = aula["id_aula"]
+        aulas_semana = int(aula["aulas_semana"])
+
+        modelo.Add(
+            sum(
+                grade[(id_aula, slot_index)]
+                for slot_index in range(len(slots))
+            ) == aulas_semana
+        )
+
+    # ========================================================================
+    # C2 — UMA TURMA POR HORÁRIO
+    # ========================================================================
+
+    for slot_index, slot in enumerate(slots):
+
+        for id_turma in turmas_unicas:
+
+            variaveis = [
+                grade[(aula["id_aula"], slot_index)]
+                for aula in aulas_validas
+                if aula["id_turma"] == id_turma
+            ]
+
+            if variaveis:
+                modelo.AddAtMostOne(variaveis)
+
+    # ========================================================================
+    # C2 — UM PROFESSOR POR HORÁRIO
+    # ========================================================================
+
+    for slot_index, slot in enumerate(slots):
+
+        for id_professor in professores_unicos:
+
+            variaveis = [
+                grade[(aula["id_aula"], slot_index)]
+                for aula in aulas_validas
+                if aula["id_professor"] == id_professor
+            ]
+
+            if variaveis:
+                modelo.AddAtMostOne(variaveis)
+
+    # ========================================================================
+    # C3 — MÁXIMO DE 2 AULAS/DIA PARA PROFESSOR + TURMA
+    # ========================================================================
+
+    dias = sorted(
+        set(slot["dia"] for slot in slots)
+    )
+
+    for dia in dias:
+
+        for id_professor in professores_unicos:
+
+            for id_turma in turmas_unicas:
+
+                variaveis = []
+
+                for slot_index, slot in enumerate(slots):
+
+                    if slot["dia"] != dia:
+                        continue
+
+                    for aula in aulas_validas:
+
+                        if (
+                            aula["id_professor"] == id_professor
+                            and aula["id_turma"] == id_turma
+                        ):
+                            variaveis.append(
+                                grade[(aula["id_aula"], slot_index)]
+                            )
+
+                if variaveis:
+                    modelo.Add(sum(variaveis) <= 2)
+
+    # ========================================================================
+    # C4 — X E Y
+    # ========================================================================
+
+    variaveis_recompensa = []
+
+    for aula in aulas_validas:
+
+        id_aula = aula["id_aula"]
+        id_professor = aula["id_professor"]
+
+        for slot_index, slot in enumerate(slots):
+
+            id_horario = slot["id_horario"]
+
+            variavel = grade[(id_aula, slot_index)]
+
+            # BLOQUEIO X
+            if (id_professor, id_horario) in bloqueios_x:
+                modelo.Add(variavel == 0)
+
+            # PREFERÊNCIA Y
+            if (id_professor, id_horario) in preferencias_y:
+                variaveis_recompensa.append(
+                    variavel * 20
+                )
+
+    # ========================================================================
+    # C5 — DOBRADINHAS PARA DISCIPLINAS PRIORITÁRIAS
+    #
+    # Mantemos a lógica original:
+    # uma disciplina prioritária recebe recompensa quando consegue
+    # duas aulas no mesmo dia.
+    # ========================================================================
+
+    for aula in aulas_validas:
+
+        nome_disciplina = disciplina_por_id[
+            aula["id_disciplina"]
+        ]
+
+        eh_prioridade = (
+            str(nome_disciplina).strip().upper()
+            in prioridades
+        )
+
+        if not eh_prioridade:
+            continue
+
+        id_aula = aula["id_aula"]
+
+        for dia in dias:
+
+            variaveis_dia = [
+                grade[(id_aula, slot_index)]
+                for slot_index, slot in enumerate(slots)
+                if slot["dia"] == dia
+            ]
+
+            if not variaveis_dia:
+                continue
+
+            tem_duas = modelo.NewBoolVar(
+                f"duas_{id_aula}_dia_{dia}"
+            )
+
+            modelo.Add(
+                sum(variaveis_dia) == 2
+            ).OnlyEnforceIf(tem_duas)
+
+            modelo.Add(
+                sum(variaveis_dia) < 2
+            ).OnlyEnforceIf(tem_duas.Not())
+
+            variaveis_recompensa.append(
+                tem_duas * 100
+            )
+
+    # ========================================================================
+    # 9. OBJETIVO
+    # ========================================================================
+
+    if variaveis_recompensa:
+        modelo.Maximize(
+            sum(variaveis_recompensa)
+        )
+
+    # ========================================================================
+    # 10. SOLVER
+    # ========================================================================
+
+    solver = cp_model.CpSolver()
+
+    solver.parameters.max_time_in_seconds = 60.0
+    solver.parameters.num_search_workers = 8
+
+    status = solver.Solve(modelo)
+
+    # ========================================================================
+    # 11. RESULTADO
+    # ========================================================================
+
+    if status in (
+        cp_model.OPTIMAL,
+        cp_model.FEASIBLE
+    ):
+
+        resultado_grade = []
+
+        for aula in aulas_validas:
+
+            id_aula = aula["id_aula"]
+
+            for slot_index, slot in enumerate(slots):
+
+                if solver.Value(
+                    grade[(id_aula, slot_index)]
+                ) == 1:
+
+                    resultado_grade.append({
+                        "id_aula": id_aula,
+                        "id_turma": aula["id_turma"],
+                        "turma": turma_por_id[aula["id_turma"]],
+                        "id_disciplina": aula["id_disciplina"],
+                        "disciplina": disciplina_por_id[
+                            aula["id_disciplina"]
+                        ],
+                        "id_professor": aula["id_professor"],
+                        "professor": professor_por_id[
+                            aula["id_professor"]
+                        ],
+                        "id_horario": slot["id_horario"],
+                        "dia_semana": slot["dia"],
+                        "numero_aula": slot["periodo"],
+                        "hora_inicio": slot["hora_inicio"],
+                        "hora_fim": slot["hora_fim"]
+                    })
+
+        # ====================================================================
+        # SALAS
+        #
+        # Por enquanto apenas informamos as salas recebidas.
+        # A alocação efetiva de salas será adicionada na próxima etapa.
+        # ====================================================================
+
+        lista_restricoes = [
+            {
+                "id_professor": disp["id_professor"],
+                "id_horario": disp["id_horario"],
+                "tipo": disp["tipo"]
+            }
+            for disp in disponibilidades
+        ]
+
+        return {
+            "status": "sucesso",
+            "mensagem": "Grade gerada com sucesso pelo OR-Tools.",
+            "solver_status": (
+                "OPTIMAL"
+                if status == cp_model.OPTIMAL
+                else "FEASIBLE"
+            ),
+            "quantidades": {
+                "turmas": len(turmas),
+                "disciplinas": len(disciplinas),
+                "professores": len(professores),
+                "aulas": len(aulas_validas),
+                "horarios": len(horarios),
+                "disponibilidades": len(disponibilidades),
+                "salas": len(salas)
+            },
+            "grade": resultado_grade,
+            "restricoes": lista_restricoes
+        }
+
+    # ========================================================================
+    # 12. FALHA DO SOLVER
+    # ========================================================================
 
     return {
-        "status": "recebido",
-        "mensagem": "Dados recebidos pelo motor de geração de grade.",
-        "quantidades": {
-            "turmas": len(turmas),
-            "disciplinas": len(disciplinas),
-            "professores": len(professores),
-            "aulas": len(aulas),
-            "horarios": len(horarios),
-            "disponibilidades": len(disponibilidades),
-            "salas": len(salas)
-        }
+        "status": "erro",
+        "mensagem": (
+            "Impossível gerar a grade. "
+            "O OR-Tools não encontrou uma solução compatível "
+            "com as restrições informadas."
+        ),
+        "solver_status": solver.StatusName(status)
     }
+
+
