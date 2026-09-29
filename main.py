@@ -2,6 +2,7 @@ import sqlite3
 import io
 import requests
 import pandas as pd
+from typing import Dict, Any
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -455,3 +456,28 @@ def exportar_grade_excel(grade: List[ItemGrade]):
     for row_idx in range(2, linha_atual): ws.row_dimensions[row_idx].height = 35
     output = io.BytesIO(); wb.save(output); output.seek(0)
     return StreamingResponse(output, headers={'Content-Disposition': 'attachment; filename="Grade_Escolar_Matriz.xlsx"'}, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@app.post("/api/gerar-grade-oracle")
+def gerar_grade_oracle(dados: Dict[str, Any]):
+    turmas = dados.get("turmas", [])
+    disciplinas = dados.get("disciplinas", [])
+    professores = dados.get("professores", [])
+    aulas = dados.get("aulas", [])
+    horarios = dados.get("horarios", [])
+    disponibilidades = dados.get("disponibilidades", [])
+    salas = dados.get("salas", [])
+
+    return {
+        "status": "recebido",
+        "mensagem": "Dados recebidos pelo motor de geração de grade.",
+        "quantidades": {
+            "turmas": len(turmas),
+            "disciplinas": len(disciplinas),
+            "professores": len(professores),
+            "aulas": len(aulas),
+            "horarios": len(horarios),
+            "disponibilidades": len(disponibilidades),
+            "salas": len(salas)
+        }
+    }
