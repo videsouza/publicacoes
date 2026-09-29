@@ -1,5 +1,6 @@
 import sqlite3
 import io
+import requests
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import FileResponse, StreamingResponse
@@ -48,6 +49,31 @@ inicializar_banco()
 @app.get("/")
 def renderizar_painel():
     return FileResponse("index.html")
+
+@app.get("/api/teste-ords")
+def teste_ords():
+    base_url = "https://oracleapex.com/ords/videsouza/grade"
+
+    endpoints = [
+        "aulas",
+        "horarios",
+        "disponibilidades",
+        "salas"
+    ]
+
+    resultado = {}
+
+    for endpoint in endpoints:
+        resposta = requests.get(
+            f"{base_url}/{endpoint}",
+            timeout=30
+        )
+
+        resposta.raise_for_status()
+
+        resultado[endpoint] = resposta.json()["items"]
+
+    return resultado
 
 class TurmaBase(BaseModel): nome: str
 class DisciplinaBase(BaseModel): nome: str
