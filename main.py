@@ -65,21 +65,74 @@ def teste_ords():
         "tempo_ok": True
     }
 
-@app.get("/api/teste-ords-direto")
-def teste_ords_direto():
+@app.get("/api/teste-ords-diagnostico")
+def teste_ords_diagnostico():
+    import requests
+    import socket
+
     url = "https://oracleapex.com/ords/videsouza/grade/teste"
 
-    resposta = requests.get(
-        url,
-        timeout=15
-    )
-
-    return {
-        "status_code": resposta.status_code,
-        "url_final": resposta.url,
-        "conteudo": resposta.text[:1000]
+    resultado = {
+        "url": url
     }
 
+    # Teste DNS
+    try:
+        ip = socket.gethostbyname("oracleapex.com")
+        resultado["dns"] = {
+            "status": "OK",
+            "ip": ip
+        }
+    except Exception as e:
+        resultado["dns"] = {
+            "status": "ERRO",
+            "erro": repr(e)
+        }
+
+    # Teste HTTPS
+    try:
+        resposta = requests.get(
+            url,
+            timeout=(5, 15),
+            allow_redirects=True
+        )
+
+        resultado["https"] = {
+            "status": "OK",
+            "status_code": resposta.status_code,
+            "url_final": resposta.url,
+            "conteudo": resposta.text[:1000]
+        }
+
+    except requests.exceptions.ConnectTimeout as e:
+        resultado["https"] = {
+            "status": "ERRO",
+            "tipo": "ConnectTimeout",
+            "erro": repr(e)
+        }
+
+    except requests.exceptions.ReadTimeout as e:
+        resultado["https"] = {
+            "status": "ERRO",
+            "tipo": "ReadTimeout",
+            "erro": repr(e)
+        }
+
+    except requests.exceptions.ConnectionError as e:
+        resultado["https"] = {
+            "status": "ERRO",
+            "tipo": "ConnectionError",
+            "erro": repr(e)
+        }
+
+    except Exception as e:
+        resultado["https"] = {
+            "status": "ERRO",
+            "tipo": type(e).__name__,
+            "erro": repr(e)
+        }
+
+    return resultado
 
 
 class TurmaBase(BaseModel): nome: str
