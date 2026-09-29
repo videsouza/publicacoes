@@ -65,17 +65,22 @@ def teste_ords():
         "tempo_ok": True
     }
 
-@app.get("/api/teste-internet")
-def teste_internet():
+@app.get("/api/teste-ords-direto")
+def teste_ords_direto():
+    url = "https://oracleapex.com/ords/videsouza/grade/teste"
+
     resposta = requests.get(
-        "https://www.google.com",
+        url,
         timeout=15
     )
 
     return {
         "status_code": resposta.status_code,
-        "url_final": resposta.url
+        "url_final": resposta.url,
+        "conteudo": resposta.text[:1000]
     }
+
+
 
 class TurmaBase(BaseModel): nome: str
 class DisciplinaBase(BaseModel): nome: str
