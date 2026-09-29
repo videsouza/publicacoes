@@ -65,6 +65,18 @@ def teste_ords():
         "tempo_ok": True
     }
 
+@app.get("/api/teste-internet")
+def teste_internet():
+    resposta = requests.get(
+        "https://www.google.com",
+        timeout=15
+    )
+
+    return {
+        "status_code": resposta.status_code,
+        "url_final": resposta.url
+    }
+
 class TurmaBase(BaseModel): nome: str
 class DisciplinaBase(BaseModel): nome: str
 class ProfessorBase(BaseModel): nome: str
