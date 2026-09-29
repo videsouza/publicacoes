@@ -52,28 +52,18 @@ def renderizar_painel():
 
 @app.get("/api/teste-ords")
 def teste_ords():
-    base_url = "https://oracleapex.com/ords/videsouza/grade"
+    url = "https://oracleapex.com"
 
-    endpoints = [
-        "aulas",
-        "horarios",
-        "disponibilidades",
-        "salas"
-    ]
+    resposta = requests.get(
+        url,
+        timeout=15
+    )
 
-    resultado = {}
-
-    for endpoint in endpoints:
-        resposta = requests.get(
-            f"{base_url}/{endpoint}",
-            timeout=30
-        )
-
-        resposta.raise_for_status()
-
-        resultado[endpoint] = resposta.json()["items"]
-
-    return resultado
+    return {
+        "status_code": resposta.status_code,
+        "url_final": resposta.url,
+        "tempo_ok": True
+    }
 
 class TurmaBase(BaseModel): nome: str
 class DisciplinaBase(BaseModel): nome: str
