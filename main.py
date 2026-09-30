@@ -461,9 +461,9 @@ def exportar_grade_excel(grade: List[ItemGrade]):
 @app.post("/api/gerar-grade-oracle")
 def gerar_grade_oracle(dados: Dict[str, Any]):
 
-    # ========================================================================
-    # 1. RECEBIMENTO DOS DADOS DO ORACLE/APEX
-    # ========================================================================
+    # ============================================================
+    # 1. DADOS RECEBIDOS DO ORACLE
+    # ============================================================
 
     turmas = dados.get("turmas", [])
     disciplinas = dados.get("disciplinas", [])
@@ -471,131 +471,217 @@ def gerar_grade_oracle(dados: Dict[str, Any]):
     aulas = dados.get("aulas", [])
     horarios = dados.get("horarios", [])
     disponibilidades = dados.get("disponibilidades", [])
-    salas = dados.get("salas", [])
+
     prioridades = [
         str(p).strip().upper()
         for p in dados.get("prioridades", [])
     ]
 
+    # SALAS NÃO PARTICIPAM DA GERAÇÃO
+    # Elas poderão ser utilizadas posteriormente
+    # em uma etapa separada de alocação física.
+
+    # ============================================================
+    # 2. VALIDAÇÃO BÁSICA
+    # ============================================================
+
+    if not turmas:
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhuma turma foi informada."
+        )
+
+    if not disciplinas:
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhuma disciplina foi informada."
+        )
+
+    if not professores:
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhum professor foi informado."
+        )
+
     if not aulas:
-        return {
-            "status": "erro",
-            "mensagem": "Nenhuma aula foi enviada para geração da grade."
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhuma aula foi informada."
+        )
 
     if not horarios:
-        return {
-            "status": "erro",
-            "mensagem": "Nenhum horário foi enviado para geração da grade."
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhum horário foi informado."
+        )
 
-    # ========================================================================
-    # 2. ORGANIZAÇÃO DOS HORÁRIOS
-    #
-    # Cada horário Oracle passa a ser uma posição real do modelo.
-    # Não usamos mais range(5) x range(6).
-    # ========================================================================
+    # ============================================================
+    # 3. MAPAS DE REFERÊNCIA
+    # ============================================================
+
+    turma_por_id = {
+        int(t["id"]): t["nome"]
+        for t in turmas
+    }
+
+    disciplina_por_id = {
+        int(d["id"]): d["nome"]
+        for d in disciplinas
+    }
+
+    professor_por_id = {
+        int(p["id"]): p["nome"]
+        for p in professores
+    }
+
+    # ============================================================
+    # 4. CONSTRUÇÃO DOS SLOTS
+    # ============================================================
 
     slots = []
 
     for h in horarios:
+
         slots.append({
-            "id_horario": h["id"],
+            "id_horario": int(h["id"]),
             "dia": int(h["dia_semana"]),
             "periodo": int(h["numero_aula"]),
             "hora_inicio": h.get("hora_inicio"),
             "hora_fim": h.get("hora_fim")
         })
 
-    # Índice interno do OR-Tools
+    # Ordenação cronológica
+    slots.sort(
+        key=lambda x: (
+            x["dia"],
+            x["periodo"]
+        )
+    )
+
+    # ============================================================
+    # 5. MAPA DOS HORÁRIOS
+    # ============================================================
+
     slot_por_id = {
-        slot["id_horario"]: i
-        for i, slot in enumerate(slots)
+        slot["id_horario"]: indice
+        for indice, slot in enumerate(slots)
     }
 
-    # ========================================================================
-    # 3. MAPAS AUXILIARES
-    # ========================================================================
-
-    turma_por_id = {
-        t["id"]: t["nome"]
-        for t in turmas
+    # Mapa:
+    # (dia, periodo) -> índice do slot
+    slot_por_dia_periodo = {
+        (slot["dia"], slot["periodo"]): indice
+        for indice, slot in enumerate(slots)
     }
 
-    disciplina_por_id = {
-        d["id"]: d["nome"]
-        for d in disciplinas
-    }
+    dias = sorted(
+        set(slot["dia"] for slot in slots)
+    )
 
-    professor_por_id = {
-        p["id"]: p["nome"]
-        for p in professores
-    }
-
-    # ========================================================================
-    # 4. VALIDAÇÃO DAS AULAS
-    # ========================================================================
+    # ============================================================
+    # 6. VALIDAÇÃO DAS AULAS
+    # ============================================================
 
     aulas_validas = []
 
     for aula in aulas:
 
-        id_aula = aula["id_aula"]
+        id_aula = int(aula["id_aula"])
+        id_turma = int(aula["id_turma"])
+        id_disciplina = int(aula["id_disciplina"])
+        id_professor = int(aula["id_professor"])
 
-        if aula["id_turma"] not in turma_por_id:
-            return {
-                "status": "erro",
-                "mensagem": f"A aula {id_aula} referencia uma turma inexistente."
-            }
+        aulas_semana = int(
+            aula.get("aulas_semana", 0)
+        )
 
-        if aula["id_disciplina"] not in disciplina_por_id:
-            return {
-                "status": "erro",
-                "mensagem": f"A aula {id_aula} referencia uma disciplina inexistente."
-            }
+        duracao = int(
+            aula.get("duracao", 1)
+        )
 
-        if aula["id_professor"] not in professor_por_id:
-            return {
-                "status": "erro",
-                "mensagem": f"A aula {id_aula} referencia um professor inexistente."
-            }
+        ativo = int(
+            aula.get("ativo", 1)
+        )
 
-        aulas_validas.append(aula)
+        if ativo != 1:
+            continue
 
-    # ========================================================================
-    # 5. PROFESSORES E TURMAS ENVOLVIDOS
-    # ========================================================================
+        if id_turma not in turma_por_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Aula {id_aula}: turma {id_turma} não encontrada."
+            )
 
-    professores_unicos = set(
-        aula["id_professor"]
-        for aula in aulas_validas
-    )
+        if id_disciplina not in disciplina_por_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Aula {id_aula}: disciplina {id_disciplina} não encontrada."
+            )
 
-    turmas_unicas = set(
-        aula["id_turma"]
-        for aula in aulas_validas
-    )
+        if id_professor not in professor_por_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Aula {id_aula}: professor {id_professor} não encontrado."
+            )
 
-    # ========================================================================
-    # 6. RESTRIÇÕES X E Y
+        if aulas_semana <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Aula {id_aula}: AULAS_SEMANA deve ser maior que zero."
+            )
+
+        if duracao <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Aula {id_aula}: DURACAO deve ser maior que zero."
+            )
+
+        aulas_validas.append({
+            "id_aula": id_aula,
+            "id_turma": id_turma,
+            "id_disciplina": id_disciplina,
+            "id_professor": id_professor,
+            "aulas_semana": aulas_semana,
+            "duracao": duracao
+        })
+
+    if not aulas_validas:
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhuma aula ativa válida foi encontrada."
+        )
+
+    # ============================================================
+    # 7. RESTRIÇÕES DOS PROFESSORES
     #
-    # X = bloqueio absoluto
+    # X = bloqueio
     # Y = preferência
-    # ========================================================================
+    # ============================================================
 
     bloqueios_x = set()
     preferencias_y = set()
 
     for disp in disponibilidades:
 
-        id_professor = disp["id_professor"]
-        id_horario = disp["id_horario"]
-        tipo = str(disp["tipo"]).strip().upper()
+        id_professor = int(
+            disp["id_professor"]
+        )
+
+        id_horario = int(
+            disp["id_horario"]
+        )
+
+        tipo = str(
+            disp["tipo"]
+        ).strip().upper()
 
         if id_horario not in slot_por_id:
             continue
 
-        chave = (id_professor, id_horario)
+        chave = (
+            id_professor,
+            id_horario
+        )
 
         if tipo == "X":
             bloqueios_x.add(chave)
@@ -603,352 +689,700 @@ def gerar_grade_oracle(dados: Dict[str, Any]):
         elif tipo == "Y":
             preferencias_y.add(chave)
 
-    # ========================================================================
-    # 7. PRÉ-CHECAGEM MATEMÁTICA
-    # ========================================================================
+    # ============================================================
+    # 8. CONSTRUÇÃO DAS OCORRÊNCIAS
+    #
+    # Exemplo:
+    #
+    # AULAS_SEMANA = 2
+    #
+    # gera:
+    #
+    # ocorrência 1
+    # ocorrência 2
+    #
+    # Não criamos registros no Oracle.
+    # São apenas variáveis internas do solver.
+    # ============================================================
 
-    # Cada professor precisa ter horários suficientes para sua carga.
-    for id_professor in professores_unicos:
+    ocorrencias = []
 
-        carga_total = sum(
-            int(aula["aulas_semana"])
-            for aula in aulas_validas
-            if aula["id_professor"] == id_professor
-        )
+    for aula in aulas_validas:
 
-        horarios_bloqueados = sum(
-            1
-            for slot in slots
-            if (id_professor, slot["id_horario"]) in bloqueios_x
-        )
+        for numero in range(1, aula["aulas_semana"] + 1):
 
-        horarios_disponiveis = len(slots) - horarios_bloqueados
+            ocorrencias.append({
+                "id_ocorrencia": len(ocorrencias),
+                "id_aula": aula["id_aula"],
+                "id_turma": aula["id_turma"],
+                "id_disciplina": aula["id_disciplina"],
+                "id_professor": aula["id_professor"],
+                "duracao": aula["duracao"]
+            })
 
-        if carga_total > horarios_disponiveis:
+    # ============================================================
+    # 9. GERAÇÃO DOS POSSÍVEIS INÍCIOS
+    #
+    # Uma ocorrência não escolhe diretamente cada horário.
+    #
+    # Ela escolhe um HORÁRIO DE INÍCIO.
+    #
+    # Se DURACAO = 2:
+    #
+    # 07:00-07:50
+    # 07:50-08:40
+    #
+    # ambos precisam existir no mesmo dia.
+    # ============================================================
 
-            nome_professor = professor_por_id[id_professor]
+    possibilidades = {}
 
-            return {
-                "status": "erro",
-                "mensagem": (
-                    f"ERRO DE MATRIZ: O(a) professor(a) "
-                    f"{nome_professor} possui {carga_total} aulas "
-                    f"alocadas, mas possui apenas "
-                    f"{horarios_disponiveis} horários disponíveis."
+    for ocorrencia in ocorrencias:
+
+        id_ocorrencia = ocorrencia["id_ocorrencia"]
+        duracao = ocorrencia["duracao"]
+        id_professor = ocorrencia["id_professor"]
+
+        possibilidades[id_ocorrencia] = []
+
+        for slot in slots:
+
+            dia = slot["dia"]
+            periodo_inicio = slot["periodo"]
+
+            horarios_ocupados = []
+
+            valido = True
+
+            for deslocamento in range(duracao):
+
+                periodo = (
+                    periodo_inicio +
+                    deslocamento
                 )
-            }
 
-    # Cada turma também precisa comportar sua carga.
-    for id_turma in turmas_unicas:
-
-        carga_turma = sum(
-            int(aula["aulas_semana"])
-            for aula in aulas_validas
-            if aula["id_turma"] == id_turma
-        )
-
-        if carga_turma > len(slots):
-
-            nome_turma = turma_por_id[id_turma]
-
-            return {
-                "status": "erro",
-                "mensagem": (
-                    f"ERRO DE MATRIZ: A turma {nome_turma} possui "
-                    f"{carga_turma} aulas, mas existem apenas "
-                    f"{len(slots)} horários disponíveis."
+                chave_slot = (
+                    dia,
+                    periodo
                 )
-            }
 
-    # ========================================================================
-    # 8. MODELO CP-SAT
-    # ========================================================================
+                if chave_slot not in slot_por_dia_periodo:
+                    valido = False
+                    break
+
+                indice_slot = slot_por_dia_periodo[
+                    chave_slot
+                ]
+
+                slot_ocupado = slots[indice_slot]
+
+                id_horario = slot_ocupado[
+                    "id_horario"
+                ]
+
+                # ------------------------------------------------
+                # X = BLOQUEIO ABSOLUTO
+                # ------------------------------------------------
+
+                if (
+                    id_professor,
+                    id_horario
+                ) in bloqueios_x:
+
+                    valido = False
+                    break
+
+                horarios_ocupados.append(
+                    indice_slot
+                )
+
+            if valido:
+
+                possibilidades[
+                    id_ocorrencia
+                ].append({
+                    "slot_inicio": slot_por_dia_periodo[
+                        (dia, periodo_inicio)
+                    ],
+                    "slots_ocupados": horarios_ocupados
+                })
+
+        # ========================================================
+        # Nenhum início possível
+        # ========================================================
+
+        if not possibilidades[id_ocorrencia]:
+
+            aula = next(
+                a for a in aulas_validas
+                if a["id_aula"] == ocorrencia["id_aula"]
+            )
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Não existe horário possível para a aula "
+                    f"{aula['id_aula']} "
+                    f"({disciplina_por_id[aula['id_disciplina']]}) "
+                    f"do professor "
+                    f"{professor_por_id[aula['id_professor']]} "
+                    f"com duração {aula['duracao']}."
+                )
+            )
+
+    # ============================================================
+    # 10. MODELO CP-SAT
+    # ============================================================
 
     modelo = cp_model.CpModel()
 
-    grade = {}
+    # variável:
+    #
+    # inicio[(ocorrencia, possibilidade)]
+    #
+    # = 1 quando aquela ocorrência começa
+    # naquele horário.
+    #
+    inicio = {}
 
-    for aula in aulas_validas:
+    for ocorrencia in ocorrencias:
 
-        id_aula = aula["id_aula"]
+        id_ocorrencia = ocorrencia[
+            "id_ocorrencia"
+        ]
 
-        for slot_index, slot in enumerate(slots):
+        for indice_possibilidade, possibilidade in enumerate(
+            possibilidades[id_ocorrencia]
+        ):
 
-            grade[(id_aula, slot_index)] = modelo.NewBoolVar(
-                f"aula_{id_aula}_slot_{slot_index}"
+            inicio[
+                (
+                    id_ocorrencia,
+                    indice_possibilidade
+                )
+            ] = modelo.NewBoolVar(
+                f"oc_{id_ocorrencia}_inicio_{indice_possibilidade}"
             )
 
-    # ========================================================================
-    # C1 — CADA AULA DEVE CUMPRIR SUA CARGA SEMANAL
-    # ========================================================================
+    # ============================================================
+    # C1
+    #
+    # CADA OCORRÊNCIA DEVE SER ALOCADA EXATAMENTE UMA VEZ
+    # ============================================================
 
-    for aula in aulas_validas:
+    for ocorrencia in ocorrencias:
 
-        id_aula = aula["id_aula"]
-        aulas_semana = int(aula["aulas_semana"])
+        id_ocorrencia = ocorrencia[
+            "id_ocorrencia"
+        ]
+
+        variaveis = [
+            inicio[
+                (
+                    id_ocorrencia,
+                    indice
+                )
+            ]
+            for indice in range(
+                len(possibilidades[id_ocorrencia])
+            )
+        ]
 
         modelo.Add(
-            sum(
-                grade[(id_aula, slot_index)]
-                for slot_index in range(len(slots))
-            ) == aulas_semana
+            sum(variaveis) == 1
         )
 
-    # ========================================================================
-    # C2 — UMA TURMA POR HORÁRIO
-    # ========================================================================
+    # ============================================================
+    # C2
+    #
+    # UMA TURMA NÃO PODE TER DUAS AULAS
+    # NO MESMO HORÁRIO OCUPADO
+    # ============================================================
 
     for slot_index, slot in enumerate(slots):
 
-        for id_turma in turmas_unicas:
+        for id_turma in set(
+            o["id_turma"]
+            for o in ocorrencias
+        ):
 
-            variaveis = [
-                grade[(aula["id_aula"], slot_index)]
-                for aula in aulas_validas
-                if aula["id_turma"] == id_turma
-            ]
+            variaveis = []
+
+            for ocorrencia in ocorrencias:
+
+                if ocorrencia["id_turma"] != id_turma:
+                    continue
+
+                id_ocorrencia = ocorrencia[
+                    "id_ocorrencia"
+                ]
+
+                for indice_possibilidade, possibilidade in enumerate(
+                    possibilidades[id_ocorrencia]
+                ):
+
+                    if slot_index in possibilidade[
+                        "slots_ocupados"
+                    ]:
+
+                        variaveis.append(
+                            inicio[
+                                (
+                                    id_ocorrencia,
+                                    indice_possibilidade
+                                )
+                            ]
+                        )
 
             if variaveis:
-                modelo.AddAtMostOne(variaveis)
 
-    # ========================================================================
-    # C2 — UM PROFESSOR POR HORÁRIO
-    # ========================================================================
+                modelo.AddAtMostOne(
+                    variaveis
+                )
 
-    for slot_index, slot in enumerate(slots):
+    # ============================================================
+    # C3
+    #
+    # MÁXIMO DE 2 AULAS/DIA
+    # PARA PROFESSOR + TURMA
+    #
+    # IMPORTANTE:
+    #
+    # Aqui contamos OCORRÊNCIAS,
+    # e não períodos ocupados.
+    #
+    # Portanto:
+    #
+    # DURACAO = 2
+    #
+    # continua sendo UMA aula para fins do C3.
+    #
+    # Isso preserva o significado de
+    # "máximo de 2 aulas/dia".
+    # ============================================================
 
-        for id_professor in professores_unicos:
-
-            variaveis = [
-                grade[(aula["id_aula"], slot_index)]
-                for aula in aulas_validas
-                if aula["id_professor"] == id_professor
-            ]
-
-            if variaveis:
-                modelo.AddAtMostOne(variaveis)
-
-    # ========================================================================
-    # C3 — MÁXIMO DE 2 AULAS/DIA PARA PROFESSOR + TURMA
-    # ========================================================================
-
-    dias = sorted(
-        set(slot["dia"] for slot in slots)
+    pares_professor_turma = set(
+        (
+            o["id_professor"],
+            o["id_turma"]
+        )
+        for o in ocorrencias
     )
 
     for dia in dias:
 
-        for id_professor in professores_unicos:
+        for id_professor, id_turma in pares_professor_turma:
 
-            for id_turma in turmas_unicas:
+            variaveis = []
 
-                variaveis = []
+            for ocorrencia in ocorrencias:
 
-                for slot_index, slot in enumerate(slots):
+                if (
+                    ocorrencia["id_professor"]
+                    != id_professor
+                ):
+                    continue
 
-                    if slot["dia"] != dia:
-                        continue
+                if (
+                    ocorrencia["id_turma"]
+                    != id_turma
+                ):
+                    continue
 
-                    for aula in aulas_validas:
+                id_ocorrencia = ocorrencia[
+                    "id_ocorrencia"
+                ]
 
-                        if (
-                            aula["id_professor"] == id_professor
-                            and aula["id_turma"] == id_turma
-                        ):
-                            variaveis.append(
-                                grade[(aula["id_aula"], slot_index)]
-                            )
+                for indice_possibilidade, possibilidade in enumerate(
+                    possibilidades[id_ocorrencia]
+                ):
 
-                if variaveis:
-                    modelo.Add(sum(variaveis) <= 2)
+                    slot_inicio = slots[
+                        possibilidade["slot_inicio"]
+                    ]
 
-    # ========================================================================
-    # C4 — X E Y
-    # ========================================================================
+                    if slot_inicio["dia"] == dia:
+
+                        variaveis.append(
+                            inicio[
+                                (
+                                    id_ocorrencia,
+                                    indice_possibilidade
+                                )
+                            ]
+                        )
+
+            if variaveis:
+
+                modelo.Add(
+                    sum(variaveis) <= 2
+                )
+
+    # ============================================================
+    # C4 / C5
+    #
+    # X já foi aplicado na construção das possibilidades.
+    #
+    # Y será utilizado como RECOMPENSA.
+    # ============================================================
 
     variaveis_recompensa = []
 
-    for aula in aulas_validas:
+    for ocorrencia in ocorrencias:
 
-        id_aula = aula["id_aula"]
-        id_professor = aula["id_professor"]
-
-        for slot_index, slot in enumerate(slots):
-
-            id_horario = slot["id_horario"]
-
-            variavel = grade[(id_aula, slot_index)]
-
-            # BLOQUEIO X
-            if (id_professor, id_horario) in bloqueios_x:
-                modelo.Add(variavel == 0)
-
-            # PREFERÊNCIA Y
-            if (id_professor, id_horario) in preferencias_y:
-                variaveis_recompensa.append(
-                    variavel * 20
-                )
-
-    # ========================================================================
-    # C5 — DOBRADINHAS PARA DISCIPLINAS PRIORITÁRIAS
-    #
-    # Mantemos a lógica original:
-    # uma disciplina prioritária recebe recompensa quando consegue
-    # duas aulas no mesmo dia.
-    # ========================================================================
-
-    for aula in aulas_validas:
-
-        nome_disciplina = disciplina_por_id[
-            aula["id_disciplina"]
+        id_ocorrencia = ocorrencia[
+            "id_ocorrencia"
         ]
 
-        eh_prioridade = (
-            str(nome_disciplina).strip().upper()
-            in prioridades
-        )
+        id_professor = ocorrencia[
+            "id_professor"
+        ]
 
-        if not eh_prioridade:
+        for indice_possibilidade, possibilidade in enumerate(
+            possibilidades[id_ocorrencia]
+        ):
+
+            variavel = inicio[
+                (
+                    id_ocorrencia,
+                    indice_possibilidade
+                )
+            ]
+
+            # Cada período ocupado que coincide com
+            # uma preferência Y recebe +20.
+            recompensa_y = 0
+
+            for slot_index in possibilidade[
+                "slots_ocupados"
+            ]:
+
+                id_horario = slots[
+                    slot_index
+                ]["id_horario"]
+
+                if (
+                    id_professor,
+                    id_horario
+                ) in preferencias_y:
+
+                    recompensa_y += 20
+
+            if recompensa_y > 0:
+
+                variaveis_recompensa.append(
+                    variavel * recompensa_y
+                )
+
+    # ============================================================
+    # C6
+    #
+    # DISCIPLINA PRIORITÁRIA:
+    #
+    # +100 quando duas ocorrências da mesma
+    # aula ficam no mesmo dia.
+    #
+    # Para DURACAO > 1 continuamos contando
+    # ocorrências, não períodos.
+    # ============================================================
+
+    aulas_prioritarias = set()
+
+    for aula in aulas_validas:
+
+        nome_disciplina = str(
+            disciplina_por_id[
+                aula["id_disciplina"]
+            ]
+        ).strip().upper()
+
+        if nome_disciplina in prioridades:
+
+            aulas_prioritarias.add(
+                aula["id_aula"]
+            )
+
+    for id_aula in aulas_prioritarias:
+
+        ocorrencias_aula = [
+            o for o in ocorrencias
+            if o["id_aula"] == id_aula
+        ]
+
+        # Só faz sentido quando há pelo menos
+        # duas ocorrências semanais.
+        if len(ocorrencias_aula) < 2:
             continue
-
-        id_aula = aula["id_aula"]
 
         for dia in dias:
 
-            variaveis_dia = [
-                grade[(id_aula, slot_index)]
-                for slot_index, slot in enumerate(slots)
-                if slot["dia"] == dia
-            ]
+            variaveis_dia = []
+
+            for ocorrencia in ocorrencias_aula:
+
+                id_ocorrencia = ocorrencia[
+                    "id_ocorrencia"
+                ]
+
+                for indice_possibilidade, possibilidade in enumerate(
+                    possibilidades[id_ocorrencia]
+                ):
+
+                    slot_inicio = slots[
+                        possibilidade["slot_inicio"]
+                    ]
+
+                    if slot_inicio["dia"] == dia:
+
+                        variaveis_dia.append(
+                            inicio[
+                                (
+                                    id_ocorrencia,
+                                    indice_possibilidade
+                                )
+                            ]
+                        )
 
             if not variaveis_dia:
                 continue
 
-            tem_duas = modelo.NewBoolVar(
-                f"duas_{id_aula}_dia_{dia}"
+            duas_aulas = modelo.NewBoolVar(
+                f"prioridade_aula_{id_aula}_dia_{dia}"
             )
 
+            # Duas ocorrências da disciplina
+            # no mesmo dia.
             modelo.Add(
-                sum(variaveis_dia) == 2
-            ).OnlyEnforceIf(tem_duas)
+                sum(variaveis_dia) >= 2
+            ).OnlyEnforceIf(
+                duas_aulas
+            )
 
             modelo.Add(
                 sum(variaveis_dia) < 2
-            ).OnlyEnforceIf(tem_duas.Not())
-
-            variaveis_recompensa.append(
-                tem_duas * 100
+            ).OnlyEnforceIf(
+                duas_aulas.Not()
             )
 
-    # ========================================================================
-    # 9. OBJETIVO
-    # ========================================================================
+            variaveis_recompensa.append(
+                duas_aulas * 100
+            )
+
+    # ============================================================
+    # OBJETIVO
+    # ============================================================
 
     if variaveis_recompensa:
+
         modelo.Maximize(
             sum(variaveis_recompensa)
         )
 
-    # ========================================================================
-    # 10. SOLVER
-    # ========================================================================
+    # ============================================================
+    # 11. SOLVER
+    # ============================================================
 
     solver = cp_model.CpSolver()
 
     solver.parameters.max_time_in_seconds = 60.0
     solver.parameters.num_search_workers = 8
 
-    status = solver.Solve(modelo)
+    status = solver.Solve(
+        modelo
+    )
 
-    # ========================================================================
-    # 11. RESULTADO
-    # ========================================================================
+    # ============================================================
+    # 12. STATUS
+    # ============================================================
 
-    if status in (
+    status_nome = solver.StatusName(
+        status
+    )
+
+    if status not in (
         cp_model.OPTIMAL,
         cp_model.FEASIBLE
     ):
 
-        resultado_grade = []
-
-        for aula in aulas_validas:
-
-            id_aula = aula["id_aula"]
-
-            for slot_index, slot in enumerate(slots):
-
-                if solver.Value(
-                    grade[(id_aula, slot_index)]
-                ) == 1:
-
-                    resultado_grade.append({
-                        "id_aula": id_aula,
-                        "id_turma": aula["id_turma"],
-                        "turma": turma_por_id[aula["id_turma"]],
-                        "id_disciplina": aula["id_disciplina"],
-                        "disciplina": disciplina_por_id[
-                            aula["id_disciplina"]
-                        ],
-                        "id_professor": aula["id_professor"],
-                        "professor": professor_por_id[
-                            aula["id_professor"]
-                        ],
-                        "id_horario": slot["id_horario"],
-                        "dia_semana": slot["dia"],
-                        "numero_aula": slot["periodo"],
-                        "hora_inicio": slot["hora_inicio"],
-                        "hora_fim": slot["hora_fim"]
-                    })
-
-        # ====================================================================
-        # SALAS
-        #
-        # Por enquanto apenas informamos as salas recebidas.
-        # A alocação efetiva de salas será adicionada na próxima etapa.
-        # ====================================================================
-
-        lista_restricoes = [
-            {
-                "id_professor": disp["id_professor"],
-                "id_horario": disp["id_horario"],
-                "tipo": disp["tipo"]
-            }
-            for disp in disponibilidades
-        ]
-
         return {
-            "status": "sucesso",
-            "mensagem": "Grade gerada com sucesso pelo OR-Tools.",
-            "solver_status": (
-                "OPTIMAL"
-                if status == cp_model.OPTIMAL
-                else "FEASIBLE"
-            ),
-            "quantidades": {
-                "turmas": len(turmas),
-                "disciplinas": len(disciplinas),
-                "professores": len(professores),
-                "aulas": len(aulas_validas),
-                "horarios": len(horarios),
-                "disponibilidades": len(disponibilidades),
-                "salas": len(salas)
-            },
-            "grade": resultado_grade,
-            "restricoes": lista_restricoes
+            "status": "ERRO",
+            "solver_status": status_nome,
+            "mensagem": (
+                "Não foi possível encontrar "
+                "uma grade viável."
+            )
         }
 
-    # ========================================================================
-    # 12. FALHA DO SOLVER
-    # ========================================================================
+    # ============================================================
+    # 13. RECUPERAÇÃO DA GRADE
+    #
+    # IMPORTANTE:
+    #
+    # Uma ocorrência com DURACAO = 2
+    # produzirá DUAS linhas.
+    #
+    # Exemplo:
+    #
+    # ID_AULA | ID_HORARIO
+    # --------------------
+    # 1       | 1
+    # 1       | 2
+    #
+    # Isso permite gravar corretamente
+    # em GRADE_HORARIA.
+    # ============================================================
+
+    grade = []
+
+    for ocorrencia in ocorrencias:
+
+        id_ocorrencia = ocorrencia[
+            "id_ocorrencia"
+        ]
+
+        possibilidade_escolhida = None
+
+        for indice_possibilidade, possibilidade in enumerate(
+            possibilidades[id_ocorrencia]
+        ):
+
+            variavel = inicio[
+                (
+                    id_ocorrencia,
+                    indice_possibilidade
+                )
+            ]
+
+            if solver.Value(variavel) == 1:
+
+                possibilidade_escolhida = possibilidade
+                break
+
+        if possibilidade_escolhida is None:
+            continue
+
+        for slot_index in possibilidade_escolhida[
+            "slots_ocupados"
+        ]:
+
+            slot = slots[
+                slot_index
+            ]
+
+            grade.append({
+
+                "id_ocorrencia":
+                    id_ocorrencia,
+
+                "id_aula":
+                    ocorrencia["id_aula"],
+
+                "id_turma":
+                    ocorrencia["id_turma"],
+
+                "turma":
+                    turma_por_id[
+                        ocorrencia["id_turma"]
+                    ],
+
+                "id_disciplina":
+                    ocorrencia["id_disciplina"],
+
+                "disciplina":
+                    disciplina_por_id[
+                        ocorrencia["id_disciplina"]
+                    ],
+
+                "id_professor":
+                    ocorrencia["id_professor"],
+
+                "professor":
+                    professor_por_id[
+                        ocorrencia["id_professor"]
+                    ],
+
+                "id_horario":
+                    slot["id_horario"],
+
+                "dia_semana":
+                    slot["dia"],
+
+                "numero_aula":
+                    slot["periodo"],
+
+                "hora_inicio":
+                    slot["hora_inicio"],
+
+                "hora_fim":
+                    slot["hora_fim"]
+            })
+
+    # ============================================================
+    # 14. ORDENAÇÃO DA GRADE
+    # ============================================================
+
+    grade.sort(
+        key=lambda x: (
+            x["dia_semana"],
+            x["numero_aula"],
+            x["turma"],
+            x["disciplina"]
+        )
+    )
+
+    # ============================================================
+    # 15. RESULTADO FINAL
+    # ============================================================
 
     return {
-        "status": "erro",
-        "mensagem": (
-            "Impossível gerar a grade. "
-            "O OR-Tools não encontrou uma solução compatível "
-            "com as restrições informadas."
-        ),
-        "solver_status": solver.StatusName(status)
+
+        "status": "SUCESSO",
+
+        "solver_status":
+            status_nome,
+
+        "objective_value":
+            solver.ObjectiveValue(),
+
+        "quantidade_ocorrencias":
+            len(ocorrencias),
+
+        "quantidade_periodos":
+            len(grade),
+
+        "quantidade_slots":
+            len(slots),
+
+        "restricoes": {
+
+            "C1_aulas_semana":
+                "Cada ocorrência é alocada exatamente uma vez.",
+
+            "C2_turma":
+                "Uma turma não pode ocupar dois horários simultaneamente.",
+
+            "C3_professor_turma":
+                "Máximo de 2 aulas por dia para cada combinação Professor + Turma.",
+
+            "C4_bloqueio_X":
+                "Professor não pode ser alocado em horário X.",
+
+            "C5_preferencia_Y":
+                "Horários Y recebem recompensa de +20.",
+
+            "C6_prioridade":
+                "Disciplina prioritária recebe +100 quando duas ocorrências ficam no mesmo dia.",
+
+            "C7_duracao":
+                "Aula ocupa períodos consecutivos.",
+
+            "C8_professor":
+                "Professor não pode ministrar duas aulas simultaneamente.",
+
+            "C9_horarios":
+                "Aula deve caber integralmente nos horários disponíveis."
+        },
+
+        "grade":
+            grade
     }
-
-
