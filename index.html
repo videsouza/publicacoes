@@ -1218,9 +1218,13 @@
         // ============================================================================
         // SISTEMA DE AUDITORIA DE GRADE AVANÇADO
         // ============================================================================
+      // ============================================================================
+        // SISTEMA DE AUDITORIA DE GRADE AVANÇADO
+        // ============================================================================
         function abrirAuditoria() {
             const grade = window.gradeAtual;
             const restricoes = window.restricoesAtual || [];
+            
             if (!grade || grade.length === 0) {
                 alert("Nenhuma grade encontrada para auditar.");
                 return;
@@ -1241,7 +1245,7 @@
             const mapaFadiga = {};
             const mapaDobradinhas = {};
 
-            // 1. Varredura da Grade Geral (Colisões e Fadiga)
+            // Varredura da Grade Geral
             grade.forEach(aula => {
                 const profKey = `${aula.dia}-${aula.periodo}-${aula.professor}`;
                 mapaProf[profKey] = (mapaProf[profKey] || 0) + 1;
@@ -1261,17 +1265,16 @@
                 }
             });
 
-            // 2. Varredura da Planilha 3 (Restrições X e Y)
+            // Varredura da Planilha 3 (Restrições)
             restricoes.forEach(res => {
-                // Tenta achar se a IA colocou uma aula exatamente neste dia/horário para este professor
                 const temAula = grade.some(aula => aula.professor === res.professor && aula.dia === res.dia && aula.periodo === res.periodo);
                 
                 if (res.tipo === 'X') {
                     totalX++;
-                    if (temAula) violacoesX++; // Se tem aula no 'X', é uma violação grave
+                    if (temAula) violacoesX++; 
                 } else if (res.tipo === 'Y') {
                     totalY++;
-                    if (temAula) satisfeitasY++; // Se tem aula no 'Y', a IA atendeu ao pedido
+                    if (temAula) satisfeitasY++; 
                 }
             });
 
@@ -1281,8 +1284,6 @@
             });
 
             const aprovado = (profColisao === 0 && turmaColisao === 0 && profFadiga === 0 && violacoesX === 0);
-
-          const aprovado = (profColisao === 0 && turmaColisao === 0 && profFadiga === 0 && violacoesX === 0);
 
             // Cria uma mensagem dinâmica explicando o que aconteceu com os 'Y'
             let mensagemFinal = '';
@@ -1315,13 +1316,13 @@
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: var(--azul-primario);"><strong>${dobradinhasPerfeitas} blocos</strong></td>
                     </tr>
                     <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Bloqueios Físicos (X)</strong> (Planilha 3)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Bloqueios Físicos (X)</strong> (Grelha)</td>
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${violacoesX === 0 ? '#10b981' : '#ef4444'};">
                             <strong>${totalX > 0 ? (violacoesX === 0 ? '✓ 100% Respeitados' : '✖ ' + violacoesX + ' Violações') : 'Sem registros'}</strong>
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Preferências Atendidas (Y)</strong> (Planilha 3)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Preferências Atendidas (Y)</strong> (Grelha)</td>
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: var(--azul-primario);">
                             <strong>${totalY > 0 ? satisfeitasY + ' de ' + totalY + ' (' + Math.round((satisfeitasY/totalY)*100) + '%)' : 'Sem registros'}</strong>
                         </td>
@@ -1329,7 +1330,7 @@
                 </table>
                 
                 <div style="background: ${aprovado ? '#dcfce7' : '#fee2e2'}; padding: 15px; border-radius: 6px; margin-top: 25px; text-align: center; border: 1px solid ${aprovado ? '#86efac' : '#fca5a5'};">
-                    <h4 style="margin: 0; color: ${aprovado ? '#166534' : '#991b1b'};">
+                    <h4 style="margin: 0; color: ${aprovado ? '#166534' : '#991b1b'}; line-height: 1.4;">
                         ${mensagemFinal}
                     </h4>
                 </div>
@@ -1337,10 +1338,9 @@
 
             document.getElementById('conteudo-auditoria').innerHTML = html;
             document.getElementById('modal-auditoria').style.display = 'flex';
-     
         }
-        }
-
+      
+        
         // ============================================================================
         // LÓGICA DA GRELHA INTERATIVA DE RESTRIÇÕES ("PLANILHA 3" VISUAL)
         // ============================================================================
