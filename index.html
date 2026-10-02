@@ -655,9 +655,10 @@
             if(secaoId === 'cadastros') itensMenu[1].classList.add('ativo');
             if(secaoId === 'gerador') {
                 itensMenu[2].classList.add('ativo');
-                carregarDropdownsMatriz(); // <-- ADICIONE ESTA LINHA AQUI
+                carregarDropdownsMatriz(); 
                 carregarListaMatriz();
                 carregarPrioridades();
+                carregarGradeRestricoes();
             }
         }
 
@@ -1004,7 +1005,10 @@
             btn.innerHTML = "⚙️ Processando Otimização...";
             btn.disabled = true;
 
-            // Mapeia todos os botões que o coordenador marcou
+            // 1. Guarda a grelha de restrições na base de dados antes de processar
+            await salvarGradeRestricoes(); 
+
+            // 2. Mapeia as disciplinas prioritárias e envia
             const prioridadesMarcadas = Array.from(document.querySelectorAll('#lista-prioridades input:checked')).map(cb => cb.value);
 
             try {
@@ -1315,6 +1319,103 @@
 
             document.getElementById('conteudo-auditoria').innerHTML = html;
             document.getElementById('modal-auditoria').style.display = 'flex';
+        }
+
+        // ============================================================================
+        // LÓGICA DA GRELHA INTERATIVA DE RESTRIÇÕES ("PLANILHA 3" VISUAL)
+        // ============================================================================
+        async function carregarGradeRestricoes() {
+            try {
+                const [resProf, resDisp] = await Promise.all([
+                    fetch('/api/professores'),
+                    fetch('/api/disponibilidades')
+                ]);
+                
+                const professores = await resProf.json();
+                const disponibilidades = await resDisp.json();
+
+                const mapaDisp = {};
+                disponibilidades.forEach(d => {
+                    mapaDisp[`${d.professor_id}-${d.dia}-${d.periodo}`] = d.tipo;
+                });
+
+                const diasStr = ['SEG', 'TER', 'QUA', 'QUI', 'SEX'];
+                let html = '<table style="width: 100%; border-collapse: collapse; text-align: center; font-size: 0.9em;">';
+                
+                // Cabeçalho Congelado
+                html += '<thead style="position: sticky; top: 0; background: var(--fundo-tela); z-index: 10;"><tr>';
+                html += '<th style="border: 1px solid var(--borda); padding: 8px;">DIA</th>';
+                html += '<th style="border: 1px solid var(--borda); padding: 8px;">AULA</th>';
+                professores.forEach(p => {
+                    html += `<th style="border: 1px solid var(--borda); padding: 8px; min-width: 85px;">${p.nome}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+
+                // Corpo da Tabela
+                for (let d = 0; d < 5; d++) {
+                    for (let p = 0; p < 6; p++) {
+                        html += '<tr>';
+                        html += `<td style="border: 1px solid var(--borda); padding: 6px; font-weight: bold; background: #f8fafc;">${diasStr[d]}</td>`;
+                        html += `<td style="border: 1px solid var(--borda); padding: 6px; font-weight: bold; background: #f8fafc;">${p + 1}</td>`;
+
+                        professores.forEach(prof => {
+                            const tipo = mapaDisp[`${prof.id}-${d}-${p}`] || '';
+                            let estilo = 'border: 1px solid var(--borda); cursor: pointer; user-select: none; transition: background 0.2s;';
+                            
+                            if (tipo === 'X') estilo += ' background-color: #fecaca; color: #dc2626; font-weight: bold;';
+                            if (tipo === 'Y') estilo += ' background-color: #bbf7d0; color: #166534; font-weight: bold;';
+
+                            html += `<td style="${estilo}" data-prof="${prof.id}" data-dia="${d}" data-periodo="${p}" onclick="alternarRestricao(this)">${tipo}</td>`;
+                        });
+                        html += '</tr>';
+                    }
+                }
+                html += '</tbody></table>';
+                document.getElementById('container-tabela-restricoes').innerHTML = html;
+            } catch (erro) {}
+        }
+
+        // Função do clique (Altera entre Vazio -> X -> Y)
+        function alternarRestricao(celula) {
+            const atual = celula.innerText;
+            if (atual === '') {
+                celula.innerText = 'X';
+                celula.style.backgroundColor = '#fecaca';
+                celula.style.color = '#dc2626';
+                celula.style.fontWeight = 'bold';
+            } else if (atual === 'X') {
+                celula.innerText = 'Y';
+                celula.style.backgroundColor = '#bbf7d0';
+                celula.style.color = '#166534';
+                celula.style.fontWeight = 'bold';
+            } else {
+                celula.innerText = '';
+                celula.style.backgroundColor = 'transparent';
+            }
+        }
+
+        // Recolhe tudo o que o utilizador marcou e envia ao Python
+        async function salvarGradeRestricoes() {
+            const celulas = document.querySelectorAll('#container-tabela-restricoes td[data-prof]');
+            const restricoes = [];
+            
+            celulas.forEach(c => {
+                const tipo = c.innerText;
+                if (tipo === 'X' || tipo === 'Y') {
+                    restricoes.push({
+                        professor_id: parseInt(c.getAttribute('data-prof')),
+                        dia: parseInt(c.getAttribute('data-dia')),
+                        periodo: parseInt(c.getAttribute('data-periodo')),
+                        tipo: tipo
+                    });
+                }
+            });
+
+            await fetch('/api/disponibilidades', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(restricoes)
+            });
         }
         
     </script>
