@@ -1282,11 +1282,29 @@
 
             const aprovado = (profColisao === 0 && turmaColisao === 0 && profFadiga === 0 && violacoesX === 0);
 
+          const aprovado = (profColisao === 0 && turmaColisao === 0 && profFadiga === 0 && violacoesX === 0);
+
+            // Cria uma mensagem dinâmica explicando o que aconteceu com os 'Y'
+            let mensagemFinal = '';
+            if (aprovado) {
+                if (totalY > 0 && satisfeitasY < totalY) {
+                    mensagemFinal = 'Grade Válida! Todas as regras obrigatórias e bloqueios (X) foram respeitados.<br><span style="font-size: 0.85em; font-weight: normal; margin-top: 5px; display: block;">Nota: Algumas preferências (Y) não puderam ser encaixadas pois conflitavam com regras mais fortes (como fadiga ou dobradinhas).</span>';
+                } else {
+                    mensagemFinal = 'Aprovação Total! A matriz cumpre 100% das restrições obrigatórias e preferências.';
+                }
+            } else {
+                mensagemFinal = 'Atenção! A matriz possui conflitos obrigatórios e precisa ser revisada.';
+            }
+
             const html = `
                 <table style="width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 1.05em;">
                     <tr>
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Colisões de Professor</strong> (Locais simultâneos)</td>
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${profColisao === 0 ? '#10b981' : '#ef4444'};"><strong>${profColisao === 0 ? '✓ 0' : '✖ ' + profColisao}</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Colisões de Turma</strong> (Aulas sobrepostas)</td>
+                        <td style="padding: 12px; border-bottom: 1px solid var(--borda); text-align: right; color: ${turmaColisao === 0 ? '#10b981' : '#ef4444'};"><strong>${turmaColisao === 0 ? '✓ 0' : '✖ ' + turmaColisao}</strong></td>
                     </tr>
                     <tr>
                         <td style="padding: 12px; border-bottom: 1px solid var(--borda);"><strong>Controle de Fadiga</strong> (Máx. 2 aulas/turma)</td>
@@ -1312,13 +1330,14 @@
                 
                 <div style="background: ${aprovado ? '#dcfce7' : '#fee2e2'}; padding: 15px; border-radius: 6px; margin-top: 25px; text-align: center; border: 1px solid ${aprovado ? '#86efac' : '#fca5a5'};">
                     <h4 style="margin: 0; color: ${aprovado ? '#166534' : '#991b1b'};">
-                        ${aprovado ? 'Aprovação Total! A matriz cumpre 100% das restrições.' : 'Atenção! A matriz possui conflitos e precisa ser revisada.'}
+                        ${mensagemFinal}
                     </h4>
                 </div>
             `;
 
             document.getElementById('conteudo-auditoria').innerHTML = html;
             document.getElementById('modal-auditoria').style.display = 'flex';
+     
         }
 
         // ============================================================================
