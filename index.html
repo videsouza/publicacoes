@@ -584,21 +584,30 @@
                 <div style="clear: both;"></div>
             </div>
 
-            <!-- PASSO 3: Regras e IA -->
+           <!-- PASSO 3: Regras, Prioridades e Restrições -->
             <div id="passo-3" class="passo-conteudo">
-                <h3 style="color: var(--azul-primario);">Configuração do Algoritmo</h3>
-                <p>Selecione as disciplinas que devem ter <strong>prioridade máxima</strong> para formar dobradinhas (blocos de 2 aulas seguidas).</p>
+                <h3 style="color: var(--azul-primario);">Configuração da Grelha</h3>
                 
-                <div style="background: var(--fundo-tela); padding: 20px; border-radius: 8px; border: 1px solid var(--borda);">
-                    <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--azul-primario);">Disciplinas Prioritárias:</h4>
-                    
-                    <!-- Os botões das disciplinas vão aparecer aqui automaticamente -->
+                <div style="background: var(--fundo-tela); padding: 20px; border-radius: 8px; border: 1px solid var(--borda); margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; margin-bottom: 15px; color: var(--azul-primario);">Disciplinas Prioritárias (Dobradinhas):</h4>
                     <div id="lista-prioridades" style="display: flex; flex-wrap: wrap; gap: 15px;"></div>
-                    
+                </div>
+
+                <!-- Nova Tabela de Restrições -->
+                <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--borda);">
+                    <h4 style="margin-top: 0; margin-bottom: 5px; color: var(--azul-primario);">Disponibilidade dos Professores</h4>
+                    <p style="font-size: 0.9em; margin-bottom: 15px;">
+                        Clique nas células para alternar: 
+                        <span style="color: #dc2626; font-weight: bold; background: #fecaca; padding: 2px 5px; border-radius: 3px;">[X] Indisponível</span> | 
+                        <span style="color: #166534; font-weight: bold; background: #bbf7d0; padding: 2px 5px; border-radius: 3px;">[Y] Preferencial</span>
+                    </p>
+                    <div id="container-tabela-restricoes" style="overflow-x: auto; max-height: 400px; border: 1px solid var(--borda);">
+                        <!-- A tabela será desenhada aqui pelo JavaScript -->
+                    </div>
                 </div>
 
                 <button class="btn-wizard voltar" style="margin-top: 20px;" onclick="mudarPasso(3, 2)">🡠 Voltar</button>
-                <button class="btn-wizard" style="background-color: #10b981; margin-top: 20px;" onclick="dispararMotorIA()">⚙️ Gerar Grade Mestra</button>
+                <button class="btn-wizard" style="background-color: #10b981; margin-top: 20px;" onclick="dispararMotorIA()">⚙️ Guardar e Gerar Grade</button>
                 <div style="clear: both;"></div>
             </div>
 
